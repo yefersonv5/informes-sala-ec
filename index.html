@@ -2225,7 +2225,7 @@ if (typeof module!=='undefined') module.exports = Core;
   function cabTarifa(primera){
     return '<thead><tr>'+(primera?'<th rowspan="2">Programa</th>':'')+'<th rowspan="2" class="num">Tarifa</th><th rowspan="2">Tipo</th><th rowspan="2" class="num">Descuento</th><th rowspan="2" class="num bl">Inscritos</th>'+
       '<th colspan="3" class="grp c-pag bl">Pagaron</th><th colspan="3" class="grp bl">Por pagar</th></tr><tr>'+
-      '<th class="num bl">No.</th><th class="num">Valor</th><th class="num">% de la tarifa</th><th class="num bl c-act">Activas</th><th class="num c-ven">Vencidas</th><th class="num">Valor</th></tr></thead>';
+      '<th class="num bl">No.</th><th class="num">Valor</th><th class="num" title="De los inscritos en esta tarifa, porcentaje que ya pagó">% que ya pagó</th><th class="num bl c-act">Activas</th><th class="num c-ven">Vencidas</th><th class="num">Valor</th></tr></thead>';
   }
   function pieTarifa(s, primera){
     var pend = s.activa.v+s.vencida.v+s.otro.v;
@@ -2236,7 +2236,7 @@ if (typeof module!=='undefined') module.exports = Core;
     var h='<div class="box" style="margin-top:24px"><h3>Pagos por tarifa</h3><div class="tbl-wrap"><table class="gen tar">'+cabTarifa(false)+'<tbody>';
     s.tarifas.forEach(function(t){ h+='<tr>'+filaTarifa(t)+'</tr>'; });
     h+='</tbody>'+pieTarifa(s,false)+'</table></div>';
-    h+='<p class="note">Cada fila agrupa a los inscritos según el valor de su orden vigente. El descuento se mide frente a la tarifa plena (la mayor tarifa de matrícula sin plan de pagos). Tipo “Mixta” indica que en esa tarifa hay órdenes de matrícula y de plan de pagos con el mismo valor.</p></div>';
+    h+='<p class="note">Cada fila agrupa a los inscritos según el valor de su orden vigente. <b>% que ya pagó</b>: de las personas inscritas en esa tarifa, cuántas ya pagaron (por ejemplo, 7 de 17 = 41,2%). El descuento se mide frente a la tarifa plena (la mayor tarifa de matrícula sin plan de pagos). Tipo “Mixta” indica que en esa tarifa hay órdenes de matrícula y de plan de pagos con el mismo valor.</p></div>';
     return h;
   }
   function tarifasGeneralHTML(t){
@@ -2411,7 +2411,7 @@ if (typeof module!=='undefined') module.exports = Core;
       setC(ws,totRow+1,4,'Control','cell');
       setC(ws,totRow+1,5,{f:'IF(AND(F'+tx+'=COUNTA('+A+'),H'+tx+'=SUM('+Fv+')),"Cuadra","Revisar")',v:'Cuadra'},'cell',F.GEN);
       // Pagos por tarifa: todo con fórmulas sobre el detalle (E = Estado 2, F = Valor)
-      var T0=totRow+3, TH=['Tarifa','Tipo','Inscritos','Pagaron (No.)','Pagado (valor)','% de la tarifa que pagó','Por pagar (No.)','Por pagar (valor)'];
+      var T0=totRow+3, TH=['Tarifa','Tipo','Inscritos','Pagaron (No.)','Pagado (valor)','% de inscritos de la tarifa que ya pagó','Por pagar (No.)','Por pagar (valor)'];
       TH.forEach(function(hd,i){ setC(ws,T0,4+i,hd,'head'); });
       var TL=s.tarifas, t1=T0+2, t2=T0+1+TL.length; // filas Excel de las tarifas
       TL.forEach(function(x,i){
@@ -2482,7 +2482,7 @@ if (typeof module!=='undefined') module.exports = Core;
     // Bloque: pagos por tarifa de todos los programas (fórmulas sobre cada hoja de programa)
     var G0=TR+3;
     setC(g,G0-1,0,'Pagos por tarifa','title');
-    ['Programa','Tarifa','Tipo','Inscritos','Pagaron (No.)','Pagado (valor)','% de la tarifa que pagó','Por pagar (No.)','Por pagar (valor)'].forEach(function(hd,i){ setC(g,G0,i,hd,'head'); });
+    ['Programa','Tarifa','Tipo','Inscritos','Pagaron (No.)','Pagado (valor)','% de inscritos de la tarifa que ya pagó','Por pagar (No.)','Por pagar (valor)'].forEach(function(hd,i){ setC(g,G0,i,hd,'head'); });
     var gr=G0+1;
     S.progs.forEach(function(p,j){
       var ps=progSheets[j], sh=q(ps.name), rg=function(col){ return sh+'!$'+col+'$'+ps.first+':$'+col+'$'+ps.last; };
