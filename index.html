@@ -143,6 +143,10 @@ tfoot td{font-weight:900;background:var(--cyan-soft);color:var(--brand-deep);bor
 .gen td.prog button{all:unset;cursor:pointer;color:var(--brand-deep);text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
 .gen td.prog button:hover{text-decoration-color:var(--brand)}
 .gen th.grp{text-align:center}
+.has-tip{cursor:help;text-decoration:underline dotted;text-decoration-color:color-mix(in srgb,currentColor 45%,transparent);text-underline-offset:3px}
+.tip{position:fixed;z-index:50;max-width:260px;background:#16384D;color:#fff;font-size:12.5px;font-weight:600;line-height:1.35;padding:7px 11px;border-radius:10px;box-shadow:0 4px 14px rgba(0,40,60,.25);pointer-events:none;opacity:0;transition:opacity .12s;top:-999px;left:-999px}
+.tip.on{opacity:1}
+@media print{.tip{display:none}}
 .tar td.prog{vertical-align:top}
 .tar tr.subt td{background:var(--soft);font-weight:800;color:var(--brand-deep)}
 .gen .bl{border-left:1px solid var(--line)}
@@ -2225,7 +2229,7 @@ if (typeof module!=='undefined') module.exports = Core;
   function cabTarifa(primera){
     return '<thead><tr>'+(primera?'<th rowspan="2">Programa</th>':'')+'<th rowspan="2" class="num">Tarifa</th><th rowspan="2">Tipo</th><th rowspan="2" class="num">Descuento</th><th rowspan="2" class="num bl">Inscritos</th>'+
       '<th colspan="3" class="grp c-pag bl">Pagaron</th><th colspan="3" class="grp bl">Por pagar</th></tr><tr>'+
-      '<th class="num bl">No.</th><th class="num">Valor</th><th class="num" title="De los inscritos en esta tarifa, porcentaje que ya pagó">% que ya pagó</th><th class="num bl c-act">Activas</th><th class="num c-ven">Vencidas</th><th class="num">Valor</th></tr></thead>';
+      '<th class="num bl">No.</th><th class="num">Valor</th><th class="num">% que ya pagó</th><th class="num bl c-act">Activas</th><th class="num c-ven">Vencidas</th><th class="num">Valor</th></tr></thead>';
   }
   function pieTarifa(s, primera){
     var pend = s.activa.v+s.vencida.v+s.otro.v;
@@ -2552,6 +2556,108 @@ if (typeof module!=='undefined') module.exports = Core;
     } catch(e){ say('err','No se pudo generar el Excel: '+e.message); }
     btn.disabled=false;
   };
+
+  /* ---------- Ayudas al pasar el mouse por encabezados y tarjetas ---------- */
+  var TIPS = {
+    // Tarjetas
+    'card|Inscritos':'Personas únicas con al menos una orden vigente (sin contar anuladas).',
+    'card|Pagaron':'Personas cuya orden ya está pagada.',
+    'card|Activas sin vencer':'No han pagado, pero su fecha límite aún no pasa.',
+    'card|Vencidas':'No pagaron y su fecha límite ya pasó.',
+    'card|Otro estado':'Órdenes con un estado que la herramienta no reconoce. Revísalas.',
+    // Tabla consolidada
+    'Programa':'Nombre del programa. Haz clic para ver su detalle.',
+    'Inscritos':'Personas únicas con orden vigente.',
+    'Pagadas|No.':'Personas que ya pagaron.',
+    'Pagadas|Valor':'Dinero ya pagado.',
+    'Activas|No.':'Personas que no han pagado pero aún están a tiempo.',
+    'Activas|Valor':'Dinero pendiente que todavía no vence.',
+    'Vencidas|No.':'Personas que no pagaron y ya pasó su fecha límite.',
+    'Vencidas|Valor':'Dinero pendiente con fecha límite vencida.',
+    'Valor total':'Suma de lo que deben pagar todos los inscritos.',
+    'Inscritos que pagaron':'De cada 100 inscritos, cuántos ya pagaron.',
+    'Valor recaudado':'De cada $100 esperados, cuántos ya entraron.',
+    'Composición del valor':'Verde: pagado. Azul: pendiente a tiempo. Rojo: vencido.',
+    'Con descuento':'Personas con orden de plan de pagos (precio con descuento).',
+    'Órdenes anuladas':'Órdenes anuladas en el sistema. No cuentan en el informe.',
+    'Pagadas':'Personas que ya pagaron y cuánto suman.',
+    'Activas':'Pendientes de pago que aún están a tiempo.',
+    'Vencidas':'Pendientes de pago con la fecha límite vencida.',
+    'Pagaron':'Lo ya pagado en cada tarifa.',
+    'Por pagar':'Lo que falta por recibir en cada tarifa.',
+    // Pagos por tarifa
+    'Tarifa':'Precio que paga la persona según su orden.',
+    'Tipo':'Matrícula: precio normal. Plan de pagos: precio con descuento.',
+    'Descuento':'Cuánto menos paga frente a la tarifa plena.',
+    'Pagaron|No.':'Personas de esta tarifa que ya pagaron.',
+    'Pagaron|Valor':'Dinero ya pagado en esta tarifa.',
+    'Pagaron|% que ya pagó':'De los inscritos en esta tarifa, cuántos ya pagaron.',
+    'Por pagar|Activas':'Aún no pagan, pero están a tiempo.',
+    'Por pagar|Vencidas':'No pagaron y la fecha límite ya pasó.',
+    'Por pagar|Valor':'Dinero que falta por recibir en esta tarifa.',
+    // Detalle del programa
+    'No. Orden':'Número de la orden de pago en el sistema.',
+    'Documento':'Documento de identidad de la persona.',
+    'Fecha limite':'Último día para pagar la orden.',
+    'Estado 1':'Estado académico de la persona en el sistema.',
+    'Estado 2':'Estado del pago: Pagada, Activa (a tiempo) o Vencida.',
+    'Valor':'Valor de la orden vigente de la persona.',
+    'Nombre':'Nombre del inscrito.',
+    'Correo':'Correo registrado en el sistema.',
+    'Telefono':'Teléfono fijo registrado.',
+    'Celular':'Celular registrado.',
+    // Resúmenes
+    'Resumen por Estado 2|No.':'Personas en ese estado de pago.',
+    'Resumen por Estado 2|% inscritos':'Qué parte de los inscritos está en ese estado.',
+    'Resumen por Estado 2|Valor':'Suma de las órdenes en ese estado.',
+    'Resumen por Estado 1|No.':'Personas en ese estado académico.',
+    // Depuración
+    'Estado plataforma':'Estado tal como viene del sistema.',
+    'Concepto':'Concepto de cobro de la orden.',
+    'Motivo':'Por qué esta orden no pasa al informe.'
+  };
+  function headerGroups(table){
+    var rows = table.tHead ? Array.prototype.slice.call(table.tHead.rows) : [];
+    var grid = [];
+    rows.forEach(function(tr, r){
+      grid[r] = grid[r] || [];
+      var c = 0;
+      Array.prototype.slice.call(tr.cells).forEach(function(th){
+        while (grid[r][c]) c++;
+        var cs = th.colSpan||1, rs = th.rowSpan||1;
+        th._col = c; th._row = r;
+        for (var i=0;i<rs;i++) for (var j=0;j<cs;j++){ grid[r+i]=grid[r+i]||[]; grid[r+i][c+j]=th; }
+        c += cs;
+      });
+    });
+    return grid;
+  }
+  function limpio(t){ return t.replace(/[▲▼]/g,'').replace(/\s+/g,' ').trim(); }
+  function aplicarTips(root){
+    root.querySelectorAll('table').forEach(function(tb){
+      var grid = headerGroups(tb), box = tb.closest('.box'), h3 = box && box.querySelector('h3') ? limpio(box.querySelector('h3').textContent) : '';
+      tb.querySelectorAll('thead th').forEach(function(th){
+        var t = limpio(th.textContent), grupo = '';
+        if (th._row>0 && grid[0] && grid[0][th._col] && grid[0][th._col]!==th) grupo = limpio(grid[0][th._col].textContent);
+        var tip = TIPS[h3+'|'+t] || (grupo && TIPS[grupo+'|'+t]) || TIPS[t];
+        if (tip){ th.setAttribute('data-tip', tip); th.classList.add('has-tip'); th.removeAttribute('title'); }
+      });
+    });
+    root.querySelectorAll('.fig .l').forEach(function(l){ var tip = TIPS['card|'+limpio(l.textContent)]; if (tip){ l.setAttribute('data-tip', tip); l.classList.add('has-tip'); } });
+  }
+  var tipEl = document.createElement('div'); tipEl.className='tip'; tipEl.setAttribute('role','tooltip'); document.body.appendChild(tipEl);
+  function mostrarTip(el){
+    tipEl.textContent = el.getAttribute('data-tip'); tipEl.classList.add('on');
+    var r = el.getBoundingClientRect(), w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+    var x = Math.min(Math.max(8, r.left + r.width/2 - w/2), window.innerWidth - w - 8);
+    var y = r.top - h - 8; if (y < 8) y = r.bottom + 8;
+    tipEl.style.left = x+'px'; tipEl.style.top = y+'px';
+  }
+  function ocultarTip(){ tipEl.classList.remove('on'); }
+  document.addEventListener('mouseover', function(e){ var el = e.target.closest && e.target.closest('[data-tip]'); if (el) mostrarTip(el); else ocultarTip(); });
+  document.addEventListener('touchstart', function(e){ var el = e.target.closest && e.target.closest('[data-tip]'); if (el) mostrarTip(el); else ocultarTip(); }, {passive:true});
+  window.addEventListener('scroll', ocultarTip, true);
+  new MutationObserver(function(){ aplicarTips($('view')); ocultarTip(); }).observe($('view'), {childList:true, subtree:true});
 
   render();
 })();
