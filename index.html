@@ -1,3 +1,4 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -142,6 +143,8 @@ tfoot td{font-weight:900;background:var(--cyan-soft);color:var(--brand-deep);bor
 .gen td.prog button{all:unset;cursor:pointer;color:var(--brand-deep);text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
 .gen td.prog button:hover{text-decoration-color:var(--brand)}
 .gen th.grp{text-align:center}
+.tar td.prog{vertical-align:top}
+.tar tr.subt td{background:var(--soft);font-weight:800;color:var(--brand-deep)}
 .gen .bl{border-left:1px solid var(--line)}
 .pill-e{display:inline-block;padding:2px 11px;border-radius:999px;font-size:12.5px;font-weight:800}
 .p-Pagada{background:var(--pag-bg);color:var(--pag)}
@@ -1967,7 +1970,27 @@ var Core = (function(){
     for (var k in extra) s[k]=extra[k];
     s.pctRecaudo = s.total ? s.pagada.v/s.total : 0;
     s.pctPagadas = s.inscritos ? s.pagada.n/s.inscritos : 0;
+    s.tarifas = tarifas(rows);
     return s;
+  }
+  /* Resumen por tarifa: agrupa por el valor de la orden conservada */
+  function tarifas(rows){
+    var m = {}, maxPlena = 0;
+    rows.forEach(function(r){
+      var t = m[r.valor] || (m[r.valor] = { valor:r.valor, inscritos:0, planes:0, pag:{n:0,v:0}, act:{n:0,v:0}, ven:{n:0,v:0}, otro:{n:0,v:0} });
+      t.inscritos++; if (r.descuento) t.planes++;
+      var k = r.estado2==='Pagada'?'pag':r.estado2==='Activa'?'act':r.estado2==='Vencida'?'ven':'otro';
+      t[k].n++; t[k].v += r.valor;
+    });
+    var list = Object.keys(m).map(function(k){ return m[k]; }).sort(function(a,b){ return b.valor-a.valor; });
+    list.forEach(function(t){ if (t.planes===0 && t.valor>maxPlena) maxPlena=t.valor; });
+    if (!maxPlena && list.length) maxPlena = list[0].valor;
+    list.forEach(function(t){
+      t.tipo = t.planes===0 ? 'Matrícula' : (t.planes===t.inscritos ? 'Plan de pagos' : 'Mixta');
+      t.dto = maxPlena && t.valor<maxPlena ? 1 - t.valor/maxPlena : 0;
+      t.pend = { n: t.act.n+t.ven.n+t.otro.n, v: t.act.v+t.ven.v+t.otro.v };
+    });
+    return list;
   }
   function fmtN(n){ return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
 
@@ -2183,12 +2206,51 @@ if (typeof module!=='undefined') module.exports = Core;
       '<td class="num bl">'+money(t.total)+'</td><td class="num">'+pct(t.pctPagadas)+'</td><td class="num">'+pct(t.pctRecaudo)+'</td><td>'+barHTML(t)+'</td><td class="num">'+t.descuento+'</td><td class="num">'+t.anuladas+'</td></tr></tfoot></table></div>';
     h+='<div class="legend"><span><i class="dot d-pag"></i>Pagado</span><span><i class="dot d-act"></i>Activo sin vencer</span><span><i class="dot d-ven"></i>Vencido</span></div>';
     h+='<p class="note"><b>Inscritos</b>: personas únicas con al menos una orden no anulada. <b>Inscritos que pagaron</b>: porcentaje de personas con orden pagada sobre el total de inscritos. <b>Valor recaudado</b>: porcentaje del dinero ya pagado sobre el valor total de las órdenes. <b>Con descuento</b>: personas cuya orden vigente es la de plan de pagos (valor con descuento). Una orden activa cuya fecha límite ya pasó frente a la fecha de corte cuenta como vencida; si la fecha límite es el mismo día del corte, sigue activa.</p>';
+    h+=tarifasGeneralHTML(t);
     var nAl = S.progs.reduce(function(a,p){return a+p.res.alerts.length;},0);
     if (nAl) h+='<div class="msg warn noprint">Hay '+nAl+(nAl>1?' observaciones':' observación')+' para revisar en la sección “Cómo se depuró” de cada programa.</div>';
     h+='</section>';
     $('view').innerHTML=h;
     $('pr').onclick=function(){ window.print(); };
     $('view').querySelectorAll('td.prog button').forEach(function(b){ b.onclick=function(){ S.active=S.progs[+b.getAttribute('data-i')].programa; render(); window.scrollTo(0,0); }; });
+  }
+
+  function dtoTxt(t){ return t.dto ? '−'+(Math.round(t.dto*1000)/10).toString().replace('.',',')+'%' : 'Plena'; }
+  function filaTarifa(t, extraCls){
+    return '<td class="num"><b>'+money(t.valor)+'</b></td><td>'+esc(t.tipo)+'</td><td class="num">'+dtoTxt(t)+'</td>'+
+      '<td class="num bl">'+t.inscritos+'</td>'+
+      '<td class="num bl c-pag"><b>'+t.pag.n+'</b></td><td class="num">'+money(t.pag.v)+'</td><td class="num pct">'+pct(t.inscritos?t.pag.n/t.inscritos:0)+'</td>'+
+      '<td class="num bl">'+t.act.n+'</td><td class="num">'+t.ven.n+'</td><td class="num">'+money(t.pend.v)+'</td>';
+  }
+  function cabTarifa(primera){
+    return '<thead><tr>'+(primera?'<th rowspan="2">Programa</th>':'')+'<th rowspan="2" class="num">Tarifa</th><th rowspan="2">Tipo</th><th rowspan="2" class="num">Descuento</th><th rowspan="2" class="num bl">Inscritos</th>'+
+      '<th colspan="3" class="grp c-pag bl">Pagaron</th><th colspan="3" class="grp bl">Por pagar</th></tr><tr>'+
+      '<th class="num bl">No.</th><th class="num">Valor</th><th class="num">% de la tarifa</th><th class="num bl c-act">Activas</th><th class="num c-ven">Vencidas</th><th class="num">Valor</th></tr></thead>';
+  }
+  function pieTarifa(s, primera){
+    var pend = s.activa.v+s.vencida.v+s.otro.v;
+    return '<tfoot><tr><td'+(primera?' colspan="4"':' colspan="3"')+'>Total</td><td class="num bl">'+s.inscritos+'</td><td class="num bl">'+s.pagada.n+'</td><td class="num">'+money(s.pagada.v)+'</td><td class="num">'+pct(s.pctPagadas)+'</td>'+
+      '<td class="num bl">'+s.activa.n+'</td><td class="num">'+s.vencida.n+'</td><td class="num">'+money(pend)+'</td></tr></tfoot>';
+  }
+  function tarifasHTML(s){
+    var h='<div class="box" style="margin-top:24px"><h3>Pagos por tarifa</h3><div class="tbl-wrap"><table class="gen tar">'+cabTarifa(false)+'<tbody>';
+    s.tarifas.forEach(function(t){ h+='<tr>'+filaTarifa(t)+'</tr>'; });
+    h+='</tbody>'+pieTarifa(s,false)+'</table></div>';
+    h+='<p class="note">Cada fila agrupa a los inscritos según el valor de su orden vigente. El descuento se mide frente a la tarifa plena (la mayor tarifa de matrícula sin plan de pagos). Tipo “Mixta” indica que en esa tarifa hay órdenes de matrícula y de plan de pagos con el mismo valor.</p></div>';
+    return h;
+  }
+  function tarifasGeneralHTML(t){
+    var h='<div class="box" style="margin-top:26px"><h3>Pagos por tarifa en todos los programas</h3><div class="tbl-wrap"><table class="gen tar">'+cabTarifa(true)+'<tbody>';
+    S.progs.forEach(function(p,i){
+      var L=p.res.stats.tarifas;
+      L.forEach(function(x,j){
+        h+='<tr>'+(j===0?'<td class="prog" rowspan="'+(L.length+1)+'"><button data-i="'+i+'">'+esc(p.programa)+'</button></td>':'')+filaTarifa(x)+'</tr>';
+      });
+      var s=p.res.stats, pend=s.activa.v+s.vencida.v+s.otro.v;
+      h+='<tr class="subt"><td colspan="3">Subtotal</td><td class="num bl">'+s.inscritos+'</td><td class="num bl">'+s.pagada.n+'</td><td class="num">'+money(s.pagada.v)+'</td><td class="num">'+pct(s.pctPagadas)+'</td><td class="num bl">'+s.activa.n+'</td><td class="num">'+s.vencida.n+'</td><td class="num">'+money(pend)+'</td></tr>';
+    });
+    h+='</tbody>'+pieTarifa(t,true)+'</table></div></div>';
+    return h;
   }
 
   var FIELDS=['orden','documento','fechaLimite','estado1','estado2','valor','nombre','correo','telefono','celular'];
@@ -2207,6 +2269,7 @@ if (typeof module!=='undefined') module.exports = Core;
     h+='</div><div class="tbl-wrap"><table><thead><tr>';
     Core.COLS.forEach(function(c,i){ var arrow = so.by===FIELDS[i] ? (so.dir>0?' ▲':' ▼') : ''; h+='<th class="sort'+(i===5?' num':'')+'" data-f="'+FIELDS[i]+'">'+c+arrow+'</th>'; });
     h+='</tr></thead><tbody id="tb"></tbody><tfoot id="tf"></tfoot></table></div>';
+    h+=tarifasHTML(s);
     h+='<div class="cols2"><div class="box"><h3>Resumen por Estado 2</h3><div class="tbl-wrap"><table><thead><tr><th>Estado 2</th><th class="num">No.</th><th class="num">% inscritos</th><th class="num">Valor</th></tr></thead><tbody>';
     [['Pagada','pagada'],['Activa','activa'],['Vencida','vencida'],['Otro','otro']].forEach(function(x){ if (x[1]!=='otro' || s.otro.n) h+='<tr><td><span class="pill-e p-'+(x[1]==='otro'?'otro':x[0])+'">'+x[0]+'</span></td><td class="num">'+s[x[1]].n+'</td><td class="num">'+pct(s.inscritos? s[x[1]].n/s.inscritos:0)+'</td><td class="num">'+money(s[x[1]].v)+'</td></tr>'; });
     h+='</tbody><tfoot><tr><td>Total</td><td class="num">'+s.inscritos+'</td><td class="num">100%</td><td class="num">'+money(s.total)+'</td></tr></tfoot></table></div></div>';
@@ -2347,8 +2410,33 @@ if (typeof module!=='undefined') module.exports = Core;
       // Control: el resumen debe cuadrar con el detalle
       setC(ws,totRow+1,4,'Control','cell');
       setC(ws,totRow+1,5,{f:'IF(AND(F'+tx+'=COUNTA('+A+'),H'+tx+'=SUM('+Fv+')),"Cuadra","Revisar")',v:'Cuadra'},'cell',F.GEN);
-      ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:totRow+1,c:10}});
-      ws['!cols']=[{wch:11},{wch:13},{wch:12},{wch:24},{wch:11},{wch:14},{wch:40},{wch:34},{wch:14},{wch:14},{wch:28}];
+      // Pagos por tarifa: todo con fórmulas sobre el detalle (E = Estado 2, F = Valor)
+      var T0=totRow+3, TH=['Tarifa','Tipo','Inscritos','Pagaron (No.)','Pagado (valor)','% de la tarifa que pagó','Por pagar (No.)','Por pagar (valor)'];
+      TH.forEach(function(hd,i){ setC(ws,T0,4+i,hd,'head'); });
+      var TL=s.tarifas, t1=T0+2, t2=T0+1+TL.length; // filas Excel de las tarifas
+      TL.forEach(function(x,i){
+        var R=T0+1+i, xr=R+1;
+        setC(ws,R,4,x.valor,'cell',F.MONEY);
+        setC(ws,R,5,x.tipo+(x.dto?' (−'+(Math.round(x.dto*1000)/10).toString().replace('.',',')+'%)':' (plena)'),'cell',F.TXT);
+        setC(ws,R,6,{f:'COUNTIF('+Fv+',E'+xr+')',v:x.inscritos},'cell',F.INT);
+        setC(ws,R,7,{f:'COUNTIFS('+E+',"Pagada",'+Fv+',E'+xr+')',v:x.pag.n},'cell',F.INT);
+        setC(ws,R,8,{f:'SUMIFS('+Fv+','+E+',"Pagada",'+Fv+',E'+xr+')',v:x.pag.v},'cell',F.MONEY);
+        setC(ws,R,9,{f:'IF(G'+xr+'=0,0,H'+xr+'/G'+xr+')',v:x.inscritos?x.pag.n/x.inscritos:0},'cell',F.PCT);
+        setC(ws,R,10,{f:'G'+xr+'-H'+xr,v:x.pend.n},'cell',F.INT);
+        setC(ws,R,11,{f:'G'+xr+'*E'+xr+'-I'+xr,v:x.pend.v},'cell',F.MONEY);
+      });
+      var TT=T0+1+TL.length, ttx=TT+1;
+      setC(ws,TT,4,'Total','tot'); setC(ws,TT,5,'','tot');
+      setC(ws,TT,6,{f:'SUM(G'+t1+':G'+t2+')',v:s.inscritos},'tot',F.INT);
+      setC(ws,TT,7,{f:'SUM(H'+t1+':H'+t2+')',v:s.pagada.n},'tot',F.INT);
+      setC(ws,TT,8,{f:'SUM(I'+t1+':I'+t2+')',v:s.pagada.v},'tot',F.MONEY);
+      setC(ws,TT,9,{f:'IF(G'+ttx+'=0,0,H'+ttx+'/G'+ttx+')',v:s.pctPagadas},'tot',F.PCT);
+      setC(ws,TT,10,{f:'SUM(K'+t1+':K'+t2+')',v:s.inscritos-s.pagada.n},'tot',F.INT);
+      setC(ws,TT,11,{f:'SUM(L'+t1+':L'+t2+')',v:s.total-s.pagada.v},'tot',F.MONEY);
+      setC(ws,TT+1,4,'Control','cell');
+      setC(ws,TT+1,5,{f:'IF(AND(G'+ttx+'=COUNTA('+A+'),H'+ttx+'=COUNTIF('+E+',"Pagada"),I'+ttx+'=SUMIF('+E+',"Pagada",'+Fv+')),"Cuadra","Revisar")',v:'Cuadra'},'cell',F.GEN);
+      ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:TT+1,c:11}});
+      ws['!cols']=[{wch:11},{wch:13},{wch:12},{wch:24},{wch:14},{wch:24},{wch:40},{wch:34},{wch:15},{wch:14},{wch:28},{wch:16}];
       ws['!rows']=[{hpt:22}];
       ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:n,c:10}})};
       progSheets.push({ws:ws,name:names[pi],first:first,last:last});
@@ -2391,8 +2479,40 @@ if (typeof module!=='undefined') module.exports = Core;
       setC(g,TR,i,{f:'SUM('+colL(i)+a1+':'+colL(i)+a2+')',v:v},'tot',CF[i]);
     });
     setC(g,TR,15,{f:'IF(COUNTIF(P'+a1+':P'+a2+',"Revisar")=0,"Cuadra","Revisar")',v:(t.otro.n?'Revisar':'Cuadra')},'tot',F.GEN);
+    // Bloque: pagos por tarifa de todos los programas (fórmulas sobre cada hoja de programa)
+    var G0=TR+3;
+    setC(g,G0-1,0,'Pagos por tarifa','title');
+    ['Programa','Tarifa','Tipo','Inscritos','Pagaron (No.)','Pagado (valor)','% de la tarifa que pagó','Por pagar (No.)','Por pagar (valor)'].forEach(function(hd,i){ setC(g,G0,i,hd,'head'); });
+    var gr=G0+1;
+    S.progs.forEach(function(p,j){
+      var ps=progSheets[j], sh=q(ps.name), rg=function(col){ return sh+'!$'+col+'$'+ps.first+':$'+col+'$'+ps.last; };
+      p.res.stats.tarifas.forEach(function(x){
+        var xr=gr+1;
+        setC(g,gr,0,p.programa,'cell',F.TXT);
+        setC(g,gr,1,x.valor,'cell',F.MONEY);
+        setC(g,gr,2,x.tipo+(x.dto?' (−'+(Math.round(x.dto*1000)/10).toString().replace('.',',')+'%)':' (plena)'),'cell',F.TXT);
+        setC(g,gr,3,{f:'COUNTIF('+rg('F')+',B'+xr+')',v:x.inscritos},'cell',F.INT);
+        setC(g,gr,4,{f:'COUNTIFS('+rg('E')+',"Pagada",'+rg('F')+',B'+xr+')',v:x.pag.n},'cell',F.INT);
+        setC(g,gr,5,{f:'SUMIFS('+rg('F')+','+rg('E')+',"Pagada",'+rg('F')+',B'+xr+')',v:x.pag.v},'cell',F.MONEY);
+        setC(g,gr,6,{f:'IF(D'+xr+'=0,0,E'+xr+'/D'+xr+')',v:x.inscritos?x.pag.n/x.inscritos:0},'cell',F.PCT);
+        setC(g,gr,7,{f:'D'+xr+'-E'+xr,v:x.pend.n},'cell',F.INT);
+        setC(g,gr,8,{f:'D'+xr+'*B'+xr+'-F'+xr,v:x.pend.v},'cell',F.MONEY);
+        gr++;
+      });
+    });
+    var g1=G0+2, g2=gr, gx=gr+1;
+    setC(g,gr,0,'Total','tot'); setC(g,gr,1,'','tot'); setC(g,gr,2,'','tot');
+    setC(g,gr,3,{f:'SUM(D'+g1+':D'+g2+')',v:t.inscritos},'tot',F.INT);
+    setC(g,gr,4,{f:'SUM(E'+g1+':E'+g2+')',v:t.pagada.n},'tot',F.INT);
+    setC(g,gr,5,{f:'SUM(F'+g1+':F'+g2+')',v:t.pagada.v},'tot',F.MONEY);
+    setC(g,gr,6,{f:'IF(D'+gx+'=0,0,E'+gx+'/D'+gx+')',v:t.pctPagadas},'tot',F.PCT);
+    setC(g,gr,7,{f:'SUM(H'+g1+':H'+g2+')',v:t.inscritos-t.pagada.n},'tot',F.INT);
+    setC(g,gr,8,{f:'SUM(I'+g1+':I'+g2+')',v:t.total-t.pagada.v},'tot',F.MONEY);
+    setC(g,gr+1,0,'Control (frente a la tabla de arriba)','cell');
+    setC(g,gr+1,1,{f:'IF(AND(D'+gx+'=C'+tx+',E'+gx+'=D'+tx+',F'+gx+'=E'+tx+'),"Cuadra","Revisar")',v:'Cuadra'},'cell',F.GEN);
+    TR=gr+1;
     g['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:TR,c:C.length-1}});
-    g['!cols']=[{wch:50},{wch:9},{wch:10},{wch:10},{wch:15},{wch:10},{wch:15},{wch:10},{wch:15},{wch:16},{wch:13},{wch:13},{wch:12},{wch:12},{wch:14},{wch:10}];
+    g['!cols']=[{wch:50},{wch:14},{wch:10},{wch:10},{wch:15},{wch:10},{wch:15},{wch:10},{wch:15},{wch:16},{wch:13},{wch:13},{wch:12},{wch:12},{wch:14},{wch:10}];
     g['!rows']=[]; g['!rows'][0]={hpt:24}; g['!rows'][H0]={hpt:46};
     g['!merges']=[{s:{r:0,c:0},e:{r:0,c:9}},{s:{r:1,c:0},e:{r:1,c:9}}];
 
@@ -2438,3 +2558,5 @@ if (typeof module!=='undefined') module.exports = Core;
 </script>
 </body>
 </html>
+
+</body></html>
