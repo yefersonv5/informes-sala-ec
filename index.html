@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -143,6 +143,16 @@ tfoot td{font-weight:900;background:var(--cyan-soft);color:var(--brand-deep);bor
 .gen td.prog button{all:unset;cursor:pointer;color:var(--brand-deep);text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
 .gen td.prog button:hover{text-decoration-color:var(--brand)}
 .gen th.grp{text-align:center}
+#btnXlsx{display:none}
+[hidden]{display:none!important}
+.dl{position:relative}
+.dl-menu{display:none;position:absolute;right:0;top:calc(100% + 8px);z-index:40;min-width:290px;padding:6px;background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:0 12px 32px rgba(0,40,60,.18)}
+.dl.open .dl-menu{display:block}
+.dl-menu button{all:unset;box-sizing:border-box;display:block;width:100%;padding:10px 14px;border-radius:12px;cursor:pointer}
+.dl-menu button:hover,.dl-menu button:focus-visible{background:var(--soft)}
+.dl-menu b{display:block;color:var(--brand-deep);font-size:14px;font-weight:800}
+.dl-menu span{display:block;color:var(--muted);font-size:12.5px;margin-top:1px}
+body.snap .carga,body.snap #msgs,body.snap #btnAdd,body.snap .hero .field{display:none!important}
 .has-tip{cursor:help;text-decoration:underline dotted;text-decoration-color:color-mix(in srgb,currentColor 45%,transparent);text-underline-offset:3px}
 .tip{position:fixed;z-index:50;max-width:260px;background:#16384D;color:#fff;font-size:12.5px;font-weight:600;line-height:1.35;padding:7px 11px;border-radius:10px;box-shadow:0 4px 14px rgba(0,40,60,.25);pointer-events:none;opacity:0;transition:opacity .12s;top:-999px;left:-999px}
 .tip.on{opacity:1}
@@ -2067,6 +2077,17 @@ if (typeof module!=='undefined') module.exports = Core;
 </script>
 <script>
 (function(){
+  var SNAP = window.__SNAP__ || null;
+  /* Piezas originales de la página, capturadas antes de pintar nada, para armar las descargas .html */
+  var ORIG = (function(){
+    var me = document.currentScript, all = Array.prototype.slice.call(document.scripts);
+    function txt(pred){ var x = all.find(function(sc){ return sc!==me && !sc.src && pred(sc.textContent); }); return x ? x.textContent : ''; }
+    var st = Array.prototype.slice.call(document.querySelectorAll('style')).find(function(x){ return x.textContent.indexOf('.hero{')>=0; });
+    var fl = document.querySelector('link[href*="fonts.googleapis"]');
+    var q = function(sel){ var e=document.querySelector(sel); return e ? e.outerHTML : ''; };
+    return { style: st ? st.outerHTML : '', font: fl ? fl.outerHTML : '', header: q('header.hero'), main: q('main'), footer: q('footer.foot'),
+             xlsx: txt(function(t){ return t.indexOf('make_xlsx_lib')>=0; }), core: txt(function(t){ return t.indexOf('var Core =')>=0; }), ui: me ? me.textContent : '' };
+  })();
   var S = { progs: [], active: 'general', corte: null, filt: {}, sort: {} };
   var $ = function(id){ return document.getElementById(id); };
   var money = function(n){ return '$' + Core.fmtN(n||0); };
@@ -2090,6 +2111,7 @@ if (typeof module!=='undefined') module.exports = Core;
   file.onchange = function(){ if (file.files.length) load(file.files); file.value=''; };
 
   function load(files){
+    if (SNAP) return;
     $('msgs').innerHTML='';
     var list = Array.prototype.slice.call(files), pending = list.length;
     list.forEach(function(f){
@@ -2112,6 +2134,7 @@ if (typeof module!=='undefined') module.exports = Core;
     });
   }
   function handlePaste(html, text){
+    if (SNAP) return;
     $('msgs').innerHTML='';
     if (!html && !text) { say('err','El portapapeles está vacío. Copia primero la tabla del informe en el sistema.'); return; }
     var d=new Date(), fuente='Pegado '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
@@ -2160,7 +2183,7 @@ if (typeof module!=='undefined') module.exports = Core;
     $('carga').classList.toggle('compact', has);
     $('paste').querySelector('strong').textContent = has ? 'Pega otro informe con Ctrl+V' : 'Pega aquí el informe del sistema';
     $('subt').textContent = has ? 'Seguimiento comercial de programas · Corte al '+fdate(S.corte) : 'Seguimiento comercial de programas';
-    var tabs=$('tabs'); tabs.hidden=!has;
+    var tabs=$('tabs'); tabs.hidden=!has || (SNAP && S.progs.length===1);
     if (!has){ $('view').innerHTML=''; return; }
     if (S.active!=='general' && !S.progs.some(function(p){return p.programa===S.active;})) S.active='general';
     var h = '<button class="tab" role="tab" data-k="general" aria-selected="'+(S.active==='general')+'">General<small>'+S.progs.length+' programa'+(S.progs.length>1?'s':'')+'</small></button>';
@@ -2186,10 +2209,59 @@ if (typeof module!=='undefined') module.exports = Core;
   }
   function fig(c,l,n,v,h){ return '<div class="fig '+c+'"><div class="l">'+l+'</div><div class="n">'+n+'</div><div class="v">'+v+'</div><div class="h">'+h+'</div></div>'; }
 
+  /* ---------- Menú Descargar ---------- */
+  function dlMenu(p){
+    var items = [];
+    if (!SNAP) items.push(['html','Página interactiva', p ? 'Solo este programa, en un archivo .html' : 'Todos los programas, en un archivo .html']);
+    items.push(['xlsx','Excel', (SNAP && S.progs.length===1) ? 'Este programa, con fórmulas' : 'Todos los programas, con fórmulas']);
+    items.push(['pdf','PDF', 'Imprime o guarda lo que estás viendo']);
+    return '<div class="dl"><button class="btn btn-deep dl-btn" aria-haspopup="menu" aria-expanded="false">Descargar <span aria-hidden="true">▾</span></button>'+
+      '<div class="dl-menu" role="menu">'+items.map(function(x){ return '<button role="menuitem" data-dl="'+x[0]+'"><b>'+x[1]+'</b><span>'+x[2]+'</span></button>'; }).join('')+'</div></div>';
+  }
+  function wireMenu(p){
+    var dl = $('view').querySelector('.dl'); if (!dl) return;
+    var b = dl.querySelector('.dl-btn');
+    b.onclick = function(e){ e.stopPropagation(); var o = !dl.classList.contains('open'); dl.classList.toggle('open', o); b.setAttribute('aria-expanded', o); if (o){ var f=dl.querySelector('[data-dl]'); if (f) f.focus(); } };
+    dl.querySelectorAll('[data-dl]').forEach(function(it){ it.onclick = function(){
+      dl.classList.remove('open'); b.setAttribute('aria-expanded', false);
+      var k = it.getAttribute('data-dl');
+      if (k==='html') descargarHTML(p); else if (k==='xlsx') $('btnXlsx').click(); else window.print();
+    }; });
+  }
+  document.addEventListener('click', function(e){ document.querySelectorAll('.dl.open').forEach(function(d){ if (!d.contains(e.target)){ d.classList.remove('open'); d.querySelector('.dl-btn').setAttribute('aria-expanded', false); } }); });
+  document.addEventListener('keydown', function(e){ if (e.key==='Escape') document.querySelectorAll('.dl.open').forEach(function(d){ d.classList.remove('open'); d.querySelector('.dl-btn').focus(); }); });
+
+  function slug(t){ return String(t).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,60) || 'Programa'; }
+  function jsonSeguro(o){ return JSON.stringify(o).replace(/</g,'\\u003c').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029'); }
+  async function guardar(nombre, blob){
+    var dl = null;
+    if (window.claude && typeof window.claude.use==='function'){ try{ dl = await window.claude.use('downloads'); }catch(e){ dl = null; } }
+    if (dl){
+      try{ await dl.save({filename:nombre, data:blob}); say('ok','Descargado: '+nombre); }
+      catch(e){ if (!e || e.code!=='declined') say('err','No se pudo descargar'+(e&&e.message?': '+e.message:'.')); }
+    } else {
+      var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=nombre; document.body.appendChild(a); a.click();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1500);
+    }
+  }
+  function descargarHTML(p){
+    var lista = p ? [p] : S.progs;
+    var data = { corte:S.corte, generado:new Date().toISOString(),
+      progs: lista.map(function(x){ return { programa:x.programa, periodo:x.periodo, archivo:x.archivo, hoja:x.hoja, ignoradas:x.ignoradas,
+        recs: x.recs.map(function(r){ var c={}; for (var k in r) if (k!=='fechaLimiteRaw') c[k]=r[k]; return c; }) }; }) };
+    var titulo = p ? p.programa : 'Consolidado de programas';
+    var html = '<!DOCTYPE html>\n<html lang="es">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'+
+      '<title>Informe de inscritos · '+esc(titulo)+'</title>\n'+ORIG.font+'\n'+ORIG.style+'\n'+
+      '<script>window.__SNAP__='+jsonSeguro(data)+';<\/script>\n</head>\n<body>\n'+ORIG.header+'\n'+ORIG.main+'\n'+ORIG.footer+'\n'+
+      '<script>'+ORIG.xlsx+'<\/script>\n<script>'+ORIG.core+'<\/script>\n<script>'+ORIG.ui+'<\/script>\n</body>\n</html>\n';
+    var nombre = 'Informe_'+(p ? slug(p.programa) : 'general')+'_corte_'+S.corte+'.html';
+    guardar(nombre, new Blob([html], {type:'text/html'}));
+  }
+
   function renderGeneral(){
     var t = totals();
     var h = '<section class="view"><div class="vhead"><div><h2>Consolidado de programas</h2><div class="meta">Corte al '+fdate(S.corte)+' · '+S.progs.length+' programa'+(S.progs.length>1?'s':'')+' · '+t.crudas+' órdenes crudas depuradas a '+t.inscritos+' inscritos</div></div>'+
-      '<div class="vactions"><button class="btn btn-line" id="pr">Imprimir o guardar PDF</button></div></div>';
+      '<div class="vactions">'+dlMenu(null)+'</div></div>';
     h += figs(t);
     h += '<div class="tbl-wrap"><table class="gen"><thead><tr>'+
       '<th rowspan="2">Programa</th><th rowspan="2" class="num">Inscritos</th>'+
@@ -2215,7 +2287,7 @@ if (typeof module!=='undefined') module.exports = Core;
     if (nAl) h+='<div class="msg warn noprint">Hay '+nAl+(nAl>1?' observaciones':' observación')+' para revisar en la sección “Cómo se depuró” de cada programa.</div>';
     h+='</section>';
     $('view').innerHTML=h;
-    $('pr').onclick=function(){ window.print(); };
+    wireMenu(null);
     $('view').querySelectorAll('td.prog button').forEach(function(b){ b.onclick=function(){ S.active=S.progs[+b.getAttribute('data-i')].programa; render(); window.scrollTo(0,0); }; });
   }
 
@@ -2263,7 +2335,7 @@ if (typeof module!=='undefined') module.exports = Core;
     var f = S.filt[k] || (S.filt[k]={estado:'Todos', q:''});
     var so = S.sort[k] || (S.sort[k]={by:null, dir:1});
     var h='<section class="view"><div class="vhead"><div><h2>'+esc(k)+'</h2><div class="meta">Periodo '+esc(p.periodo||'s/d')+' · Archivo '+esc(p.archivo)+' · Corte al '+fdate(S.corte)+'</div></div>'+
-      '<div class="vactions"><button class="btn btn-line" id="pr">Imprimir o guardar PDF</button><button class="btn btn-danger" id="rm">Quitar programa</button></div></div>';
+      '<div class="vactions">'+(SNAP?'':'<button class="btn btn-danger" id="rm">Quitar programa</button>')+dlMenu(p)+'</div></div>';
     h+=figs(s);
     var rev=r.alerts.filter(function(a){ return a.indexOf('Revisar:')===0; });
     rev.forEach(function(a){ h+='<div class="msg warn noprint" style="margin:-8px 0 16px">'+esc(a)+'</div>'; });
@@ -2292,8 +2364,8 @@ if (typeof module!=='undefined') module.exports = Core;
       h+='</tbody></table></div>'; }
     h+='</div></details></section>';
     $('view').innerHTML=h;
-    $('pr').onclick=function(){ window.print(); };
-    $('rm').onclick=function(){ if (confirm('¿Quitar “'+k+'” del informe?')){ S.progs=S.progs.filter(function(x){return x!==p;}); S.active='general'; render(); } };
+    wireMenu(p);
+    if ($('rm')) $('rm').onclick=function(){ if (confirm('¿Quitar “'+k+'” del informe?')){ S.progs=S.progs.filter(function(x){return x!==p;}); S.active='general'; render(); } };
     $('q').oninput=function(){ f.q=this.value; fillRows(p); };
     $('view').querySelectorAll('.chip').forEach(function(c){ c.onclick=function(){ f.estado=c.getAttribute('data-e'); $('view').querySelectorAll('.chip').forEach(function(x){ x.setAttribute('aria-pressed', x===c); }); fillRows(p); }; });
     $('view').querySelectorAll('th.sort').forEach(function(th){ th.onclick=function(){ var fd=th.getAttribute('data-f'); if (so.by===fd){ if (so.dir>0) so.dir=-1; else { so.by=null; so.dir=1; } } else { so.by=fd; so.dir=1; } renderProg(p); }; });
@@ -2658,6 +2730,16 @@ if (typeof module!=='undefined') module.exports = Core;
   document.addEventListener('touchstart', function(e){ var el = e.target.closest && e.target.closest('[data-tip]'); if (el) mostrarTip(el); else ocultarTip(); }, {passive:true});
   window.addEventListener('scroll', ocultarTip, true);
   new MutationObserver(function(){ aplicarTips($('view')); ocultarTip(); }).observe($('view'), {childList:true, subtree:true});
+
+  if (SNAP){
+    S.progs = SNAP.progs || []; S.corte = SNAP.corte || S.corte; $('corte').value = S.corte;
+    S.active = S.progs.length===1 ? S.progs[0].programa : 'general';
+    recompute();
+    document.body.classList.add('snap');
+    var g = new Date(SNAP.generado);
+    $('btnXlsx').disabled = false;
+    document.querySelector('footer.foot').textContent = 'Informe generado el '+g.toLocaleDateString('es-CO')+' a las '+g.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:false})+'. Copia de consulta: los datos no se pueden modificar.';
+  }
 
   render();
 })();
