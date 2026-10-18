@@ -11,7 +11,8 @@
 :root{
   --brand:#00A669; --brand-deep:#014948; --cyan:#A9D9C6; --cyan-soft:#E9F3EF; --mint:#67D301; --teal:#014948;
   --slate:#2C3E50; --slate-2:#1C2833; --slate-line:#3B4D5F; --lime:#67D301;
-  --paper:#FFFFFF; --surface:#FFFFFF; --ink:#011F19; --muted:#5A6B67; --line:#DCE5E1; --soft:#EEF3F1;
+  --paper:#F2F5F3; --surface:#FFFFFF; --ink:#011F19; --muted:#56665F; --line:#E0E7E3; --soft:#EEF2F0;
+  --shadow:0 1px 2px rgba(1,31,25,.04),0 6px 20px rgba(1,31,25,.05);
   --pag:#00965E; --pag-bg:#E1F5EB; --act:#1F6FB5; --act-bg:#E5EFF9; --ven:#D2453D; --ven-bg:#FCE7E5;
   --warn:#8A5A07; --warn-bg:#FDF2DC;
   --font:"Outfit", "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
@@ -19,14 +20,14 @@
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --paper:#0C1714; --surface:#13221E; --ink:#E4EFEB; --muted:#98ADA7; --line:#25392F; --soft:#1A2C26; --cyan-soft:#16302A; --cyan:#2F5A4B;
+    --paper:#0C1714; --surface:#13221E; --ink:#E4EFEB; --muted:#98ADA7; --line:#25392F; --soft:#1A2C26; --cyan-soft:#16302A; --cyan:#2F5A4B; --shadow:none;
     --brand-deep:#7FD8B6; --brand:#2FD08F;
     --pag:#4FD69C; --pag-bg:#173A2D; --act:#6FB0EE; --act-bg:#16304A; --ven:#F2857E; --ven-bg:#3E2020;
     --warn:#E8B75C; --warn-bg:#382C15;
   }
 }
 :root[data-theme="dark"]{
-  --paper:#0C1714; --surface:#13221E; --ink:#E4EFEB; --muted:#98ADA7; --line:#25392F; --soft:#1A2C26; --cyan-soft:#16302A; --cyan:#2F5A4B;
+  --paper:#0C1714; --surface:#13221E; --ink:#E4EFEB; --muted:#98ADA7; --line:#25392F; --soft:#1A2C26; --cyan-soft:#16302A; --cyan:#2F5A4B; --shadow:none;
   --brand-deep:#7FD8B6; --brand:#2FD08F;
   --pag:#4FD69C; --pag-bg:#173A2D; --act:#6FB0EE; --act-bg:#16304A; --ven:#F2857E; --ven-bg:#3E2020;
   --warn:#E8B75C; --warn-bg:#382C15;
@@ -43,13 +44,14 @@ button,input,select{font:inherit;color:inherit}
 .ueb{height:64px;width:auto;display:block;margin-bottom:22px}
 .banner{position:relative;overflow:hidden;isolation:isolate;background:#014948;border-radius:22px;margin-top:0;min-height:300px;
   display:grid;grid-template-columns:1fr auto;align-items:center;gap:18px 32px;padding:36px 56px 44px}
-.banner::after{content:"";position:absolute;z-index:-1;width:760px;height:760px;border-radius:50%;background:var(--lime);right:-120px;top:150px}
+.banner::after{content:"";position:absolute;z-index:-1;width:620px;height:620px;border-radius:50%;background:var(--lime);right:-170px;top:175px}
 .hgroup .k1{display:block;color:var(--lime);font-size:46px;font-weight:300;line-height:1;letter-spacing:-.01em}
 .hgroup h1{margin:2px 0 0;font-size:86px;line-height:.95;font-weight:800;letter-spacing:-.035em;color:#fff}
 .hgroup p{margin:12px 0 0;font-size:19px;font-weight:400;color:#E4F0EC}
 .ctrl{background:#fff;color:var(--ink);border-radius:20px;padding:20px 22px;display:flex;flex-direction:column;gap:12px;min-width:250px;box-shadow:0 16px 40px rgba(0,30,25,.28)}
-.ctrl .ctrl-t{font-weight:700;font-size:15px;color:#014948;margin:0}
-.field{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.ctrl .ctrl-t{font-weight:700;font-size:16px;color:#014948}
+.field small{font-size:12px;font-weight:400;color:var(--muted);max-width:230px;line-height:1.35;margin-top:4px}
+.field{display:flex;flex-direction:column;gap:6px;font-size:12.5px;font-weight:600;color:var(--muted)}
 .field input{background:#F1F4F2;border:0;color:#011F19;border-radius:999px;padding:10px 16px;color-scheme:light;font-size:14.5px}
 .btn{border:1px solid transparent;border-radius:999px;padding:10px 20px;font-weight:700;cursor:pointer;font-size:14.5px;white-space:nowrap}
 .btn-deep{background:#00A669;color:#fff}.btn-deep:hover{background:#008A57}
@@ -57,30 +59,33 @@ button,input,select{font:inherit;color:inherit}
 .ctrl .btn{width:100%}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 
-/* Zona de carga */
-.drop{margin:26px 0 8px;border:2px dashed var(--cyan);border-radius:24px;background:var(--surface);padding:34px 24px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
-.drop.over{border-color:var(--brand);background:var(--cyan-soft)}
-.drop strong{display:block;font-size:20px;font-weight:700;margin-bottom:6px;color:var(--brand-deep)}
-.drop span{color:var(--muted);font-size:14px}
-.drop.compact{padding:12px 20px;margin:20px 0 0;text-align:left;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-.drop.compact strong{font-size:15px;margin:0;display:inline}
-
-.carga{display:grid;grid-template-columns:1.6fr 1fr;gap:16px;margin:26px 0 8px}
-.carga .drop{margin:0;display:flex;flex-direction:column;justify-content:center}
-.paste{background:var(--surface);border:1px solid var(--line);border-radius:24px;padding:26px 30px}
-.paste.flash{border-color:var(--mint);background:var(--pag-bg)}
-.paste strong{display:block;font-size:24px;font-weight:700;color:var(--ink);margin-bottom:8px;letter-spacing:-.01em}
-.paste ol{margin:0 0 12px;padding-left:20px;color:var(--muted);font-size:14px}
-.paste ol li{margin:3px 0}
-.paste textarea{font-family:inherit;width:100%;border:0;border-radius:999px;padding:14px 24px;background:var(--soft);resize:none;font-size:15px;color:var(--muted);height:52px;line-height:24px;overflow:hidden}
-.carga.compact{grid-template-columns:1fr auto;margin-top:20px}
-.carga.compact .paste{padding:12px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-.carga.compact .paste strong{font-size:15px;margin:0}
-.carga.compact .paste ol{display:none}
-.carga.compact .paste textarea{flex:1 1 220px;width:auto}
-.carga.compact .drop{padding:12px 20px}
-.carga.compact .drop span{display:none}
-@media (max-width:760px){ .carga,.carga.compact{grid-template-columns:1fr} }
+/* Zona de carga: una sola tarjeta */
+.carga{margin:26px 0 8px}
+.paste{background:var(--surface);border:1px solid var(--line);border-radius:24px;padding:26px 30px;box-shadow:var(--shadow);transition:border-color .2s,background .2s}
+.paste.flash{border-color:var(--lime)}
+.paste>strong{display:block;font-size:24px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
+.pasos{list-style:none;margin:16px 0 20px;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.pasos li{display:flex;gap:12px;align-items:flex-start;font-size:14px;color:var(--muted);line-height:1.4}
+.pasos b{flex:0 0 28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--cyan-soft);color:var(--brand-deep);font-weight:700;font-size:14px}
+kbd{font-family:inherit;font-size:12px;font-weight:600;border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:0 5px;background:var(--surface);color:var(--ink)}
+.paste-row{display:flex;gap:12px;align-items:stretch}
+.paste textarea{font-family:inherit;flex:1 1 auto;min-width:0;border:1px solid transparent;border-radius:999px;padding:14px 24px;background:var(--soft);resize:none;font-size:15px;color:var(--muted);height:54px;line-height:24px;overflow:hidden}
+.paste textarea:focus{outline:none;border-color:var(--brand)}
+.drop{flex:0 0 auto;display:flex;flex-direction:column;justify-content:center;align-items:center;border:1.5px dashed var(--cyan);border-radius:999px;padding:6px 26px;cursor:pointer;background:var(--surface);transition:border-color .15s,background .15s}
+.drop:hover,.drop.over{border-color:var(--brand);background:var(--cyan-soft)}
+.drop b{font-size:15px;font-weight:700;color:var(--brand-deep);line-height:1.2}
+.drop span{font-size:12px;color:var(--muted)}
+.carga.compact{margin-top:20px}
+.carga.compact .paste{padding:12px 14px 12px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.carga.compact .paste>strong{font-size:16px}
+.carga.compact .pasos{display:none}
+.carga.compact .paste-row{flex:1 1 360px}
+@media (max-width:760px){
+  .pasos{grid-template-columns:1fr;gap:10px}
+  .paste-row{flex-direction:column}
+  .paste textarea{height:auto;min-height:76px;border-radius:22px;overflow:auto}
+  .drop{border-radius:18px;padding:12px}
+}
 .msgs{margin:10px 0 0}
 .msg{border-radius:12px;padding:9px 14px;margin-top:8px;font-size:14px;font-weight:600}
 .msg.err{background:var(--ven-bg);color:var(--ven)}
@@ -106,7 +111,7 @@ section.view{padding:22px 0 56px}
 
 /* Cifras principales */
 .figs{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:22px}
-.fig{background:var(--surface);padding:16px 20px;border-radius:20px;border:1px solid var(--line);border-top:5px solid var(--c,var(--brand-deep))}
+.fig{background:var(--surface);padding:16px 20px;border-radius:20px;border:1px solid var(--line);box-shadow:var(--shadow);border-top:5px solid var(--c,var(--brand-deep))}
 .fig .l{font-size:13.5px;color:var(--muted);font-weight:700}
 .fig .n{font-size:40px;font-weight:800;letter-spacing:-.02em;line-height:1.05;margin-top:6px;color:var(--c,var(--brand-deep))}
 .fig .v{font-size:14px;margin-top:3px;color:var(--ink);font-weight:600}
@@ -123,7 +128,7 @@ section.view{padding:22px 0 56px}
 .d-pag{background:var(--pag)}.d-act{background:var(--act)}.d-ven{background:var(--ven)}
 
 /* Tablas */
-.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:18px;background:var(--surface)}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:18px;background:var(--surface);box-shadow:var(--shadow)}
 table{border-collapse:collapse;width:100%;font-size:13.5px}
 th,td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
 thead th{background:var(--cyan-soft);font-weight:800;font-size:12.5px;color:var(--brand-deep);position:sticky;top:0;z-index:1}
@@ -139,7 +144,7 @@ tfoot td{font-weight:900;background:var(--cyan-soft);color:var(--brand-deep);bor
 .gen td.prog button{all:unset;cursor:pointer;color:var(--brand-deep);text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
 .gen td.prog button:hover{text-decoration-color:var(--brand)}
 .gen th.grp{text-align:center}
-#btnXlsx{display:none}
+#btnXlsx,#btnAdd{display:none}
 .pend{background:var(--surface);border:2px solid var(--cyan);border-radius:18px;padding:16px 20px;margin-top:8px}
 .pend p{margin:0 0 12px;font-size:14.5px}
 .pend-b{display:flex;gap:10px;flex-wrap:wrap}
@@ -179,7 +184,7 @@ body.snap .banner{grid-template-columns:1fr}
 
 .cols2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:24px}
 .box h3{margin:0 0 10px;font-size:19px;font-weight:700;color:var(--brand-deep)}
-details.log{margin-top:24px;border:1px solid var(--line);border-radius:18px;background:var(--surface)}
+details.log{margin-top:24px;border:1px solid var(--line);border-radius:18px;background:var(--surface);box-shadow:var(--shadow)}
 details.log summary{cursor:pointer;padding:13px 18px;font-weight:800;color:var(--brand-deep)}
 details.log .in{padding:0 18px 18px}
 details.log ul{margin:6px 0 0;padding-left:18px;font-size:13.5px}
@@ -227,9 +232,9 @@ details.log li{margin:4px 0}
         <p id="subt">Seguimiento comercial de programas</p>
       </div>
       <div class="ctrl">
-        <p class="ctrl-t">Configura el informe</p>
-        <label class="field">Fecha de corte
+        <label class="field"><span class="ctrl-t">Fecha de corte</span>
           <input type="date" id="corte">
+          <small>Las órdenes sin pagar con fecha límite anterior cuentan como vencidas.</small>
         </label>
         <button class="btn btn-white" id="btnAdd">Cargar archivos</button>
         <button class="btn btn-deep" id="btnXlsx" disabled>Exportar a Excel</button>
@@ -244,16 +249,15 @@ details.log li{margin:4px 0}
   <div class="carga" id="carga">
     <div class="paste" id="paste">
       <strong>Pega aquí el informe del sistema</strong>
-      <ol>
-        <li>En el sistema, selecciona la tabla del informe completa, desde los encabezados hasta la última fila, y cópiala con Ctrl+C.</li>
-        <li>Vuelve a esta página y presiona Ctrl+V. No hace falta hacer clic en ningún lugar.</li>
-        <li>Repite con cada programa; cada uno queda en su propia pestaña.</li>
+      <ol class="pasos">
+        <li><b>1</b><span>En el sistema, selecciona la tabla completa (desde los encabezados) y cópiala con <kbd>Ctrl</kbd>+<kbd>C</kbd></span></li>
+        <li><b>2</b><span>Vuelve aquí y presiona <kbd>Ctrl</kbd>+<kbd>V</kbd>, sin hacer clic en ningún lugar</span></li>
+        <li><b>3</b><span>Repite con cada programa; cada uno queda en su propia pestaña</span></li>
       </ol>
-      <textarea id="pasteBox" rows="2" placeholder="Si Ctrl+V no funciona, haz clic aquí y pega" aria-label="Pegar informe"></textarea>
-    </div>
-    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Cargar archivos de Excel">
-      <strong>O carga archivos de Excel</strong>
-      <span>Arrastra uno o varios archivos (.xls, .xlsx, .csv) o haz clic para buscarlos.</span>
+      <div class="paste-row">
+        <textarea id="pasteBox" rows="1" placeholder="Si Ctrl+V no funciona, haz clic aquí y pega" aria-label="Pegar informe"></textarea>
+        <div class="drop" id="drop" tabindex="0" role="button" aria-label="Cargar archivos de Excel"><b>Cargar Excel</b><span>o arrastra el archivo aquí</span></div>
+      </div>
     </div>
   </div>
   <div class="msgs" id="msgs" aria-live="polite"></div>
