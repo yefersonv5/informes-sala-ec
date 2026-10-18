@@ -1,4 +1,3 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -144,6 +143,12 @@ tfoot td{font-weight:900;background:var(--cyan-soft);color:var(--brand-deep);bor
 .gen td.prog button:hover{text-decoration-color:var(--brand)}
 .gen th.grp{text-align:center}
 #btnXlsx{display:none}
+.pend{background:var(--surface);border:2px solid var(--cyan);border-radius:18px;padding:16px 20px;margin-top:8px}
+.pend p{margin:0 0 12px;font-size:14.5px}
+.pend-b{display:flex;gap:10px;flex-wrap:wrap}
+.pend-b .btn{display:flex;flex-direction:column;align-items:flex-start;border-radius:14px;padding:9px 16px;text-align:left}
+.pend-b small{font-weight:600;font-size:12px;opacity:.85}
+.tag{display:inline-block;background:var(--warn-bg);color:var(--warn);font-weight:800;font-size:12px;border-radius:999px;padding:1px 9px;margin-right:4px}
 [hidden]{display:none!important}
 .dl{position:relative}
 .dl-menu{display:none;position:absolute;right:0;top:calc(100% + 8px);z-index:40;min-width:290px;padding:6px;background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:0 12px 32px rgba(0,40,60,.18)}
@@ -1806,6 +1811,7 @@ var Core = (function(){
     'ANDRÉS JOSÉ MARÍA SOFÍA LUCÍA MOISÉS JESÚS RAMÓN RAÚL JOAQUÍN MARTÍN SEBASTIÁN JULIÁN ADRIÁN IVÁN TOMÁS NICOLÁS MATÍAS ÁNGELA ÁNGEL '+
     'MÓNICA VERÓNICA ANGÉLICA JÉSSICA YÉSICA INÉS CRISTÓBAL SAÚL EFRAÍN HERNÁN GERMÁN FABIÁN DAMIÁN CRISTIÁN ELÍAS ISAÍAS TOBÍAS NOÉ SIMÓN '+
     'DARÍO MARÍN VALERÍA ROCÍO NATALÍ BEATRÍZ LEÓNIDAS ÓSCAR ÉDGAR ÉRICA ÉRIKA ÍNGRID DÉBORA BÁRBARA LEÍDY YULIÁN HÉCTOR NÉSTOR VÍCTOR CÉSAR '+
+    'PEÑARANDA ESTUPIÑAN ESTUPIÑÁN BRICEÑO NIÑO CAÑAVERAL CASTAÑO MUÑETONES PIÑEROS PIÑERES ZUÑIGA SALDAÑA ORDÓÑEZ ' +
     'FÉLIX RUBÉN ARLÉS ARÍSTIDES ASTRÍD GÉNESIS SAMUÉL JAZMÍN YASMÍN DAYÁN ESTÉFANY ESTÉFANI ESTEFANÍA STEFANÍA ALEJANDRÍA').split(' ');
   function arreglarPalabra(w){
     if (w.indexOf('\ufffd')<0) return null;
@@ -1828,6 +1834,11 @@ var Core = (function(){
     if (!s) return s;
     return norm(s).toLocaleLowerCase('es').split(' ').map(function(w,i){
       var base = w;
+      if (acentuar && w.indexOf('\ufffd')>=0){
+        var re = new RegExp('^'+w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\ufffd/g,'[áéíóúñü]')+'$');
+        var c = ACENTOS.filter(function(x){ return re.test(x); });
+        if (c.length===1){ w = c[0].normalize('NFD').replace(/[\u0300-\u036f]/g,''); base = c[0]; }
+      }
       if (acentuar && MAPA_ACENTOS[w]) base = MAPA_ACENTOS[w];
       if (i>0 && MENORES[w]) return w;
       return base.split('-').map(capWord).join('-');
@@ -1943,13 +1954,17 @@ var Core = (function(){
       validas.sort(function(a,b){
         var ta=rank[tipoEstado(a.estadoPlataforma)], tb=rank[tipoEstado(b.estadoPlataforma)];
         if (ta!==tb) return ta-tb;
+        var pa=+a.periodo||0, pb=+b.periodo||0;
+        if (pa!==pb) return pb-pa;              /* programa aplazado: manda el periodo más reciente */
         if (a.valor!==b.valor) return a.valor-b.valor;
         return b.orden-a.orden;
       });
       var sel = validas[0];
-      validas.slice(1).forEach(function(r){ nConsolidadas++; log.push({r:r, motivo:'Orden duplicada de la misma persona; se conserva la No. '+sel.orden+' ('+sel.estadoPlataforma+', $'+fmtN(sel.valor)+')'}); });
-      var tipos = {}; validas.forEach(function(r){ tipos[tipoEstado(r.estadoPlataforma)]=1; });
-      if (Object.keys(tipos).length>1) alerts.push('Revisar: '+(sel.nombre||'')+' (documento '+sel.documento+') tiene al mismo tiempo órdenes pagadas y sin pagar ('+validas.map(function(r){return 'No. '+r.orden+' '+r.estadoPlataforma+' $'+fmtN(r.valor);}).join(', ')+'). En el informe quedó la pagada.');
+      validas.slice(1).forEach(function(r){ nConsolidadas++; log.push({r:r, motivo:(r.periodo && sel.periodo && r.periodo!==sel.periodo ? 'Orden del periodo '+r.periodo+' (programa aplazado)' : 'Orden duplicada de la misma persona')+'; se conserva la No. '+sel.orden+(r.periodo!==sel.periodo && sel.periodo ? ' del periodo '+sel.periodo : '')+' ('+sel.estadoPlataforma+', $'+fmtN(sel.valor)+')'}); });
+      var pendientes = validas.filter(function(r){ return tipoEstado(r.estadoPlataforma)!=='pagada' && (+r.periodo||0) >= (+sel.periodo||0); });
+      if (tipoEstado(sel.estadoPlataforma)==='pagada' && pendientes.length) alerts.push('Revisar: '+(sel.nombre||'')+' (documento '+sel.documento+') tiene al mismo tiempo órdenes pagadas y sin pagar ('+validas.map(function(r){return 'No. '+r.orden+' '+r.estadoPlataforma+' $'+fmtN(r.valor);}).join(', ')+'). En el informe quedó la pagada.');
+      if (/prueba|test|ejemplo/i.test(sel.correo||'') || /(.)\1{4,}/i.test(String(sel.nombre||'').replace(/\s/g,'')))
+        alerts.push('Revisar: posible registro de prueba. '+(sel.nombre||'')+' (documento '+sel.documento+', '+(sel.correo||'sin correo')+') se cuenta como inscrito; confírmalo en el sistema.');
       var t = tipoEstado(sel.estadoPlataforma), e2;
       if (t==='pagada') e2='Pagada';
       else if (t==='activa'){
@@ -1962,7 +1977,7 @@ var Core = (function(){
         orden: sel.orden, documento: sel.documento, fechaLimite: sel.fechaLimite, estado1: sel.estado1, estado2: e2,
         valor: sel.valor, nombre: sel.nombre, correo: sel.correo, telefono: sel.telefono, celular: sel.celular,
         descuento: /plan/i.test(sel.concepto) || /plan/i.test(sel.estadoPlataforma),
-        estadoPlataforma: sel.estadoPlataforma, fechaPago: sel.fechaPago
+        estadoPlataforma: sel.estadoPlataforma, fechaPago: sel.fechaPago, periodo: sel.periodo
       });
     });
     if (reparados.length) alerts.push('Se corrigieron automáticamente tildes o eñes dañadas en '+reparados.length+' nombre'+(reparados.length>1?'s':'')+' (verifícalos): '+reparados.join('; ')+'.');
@@ -2113,23 +2128,25 @@ if (typeof module!=='undefined') module.exports = Core;
   function load(files){
     if (SNAP) return;
     $('msgs').innerHTML='';
-    var list = Array.prototype.slice.call(files), pending = list.length;
-    list.forEach(function(f){
+    var list = Array.prototype.slice.call(files), pending = list.length, res = new Array(list.length);
+    function terminar(){
+      var ult = null, n = 0;
+      res.forEach(function(x, k){
+        if (!x) return;
+        if (x.err){ say('err', list[k].name+': '+x.err); return; }
+        x.found.forEach(function(p){ var r = incorporar(p); if (r){ ult = r; n++; } });
+      });
+      S.active = (list.length===1 && ult) ? ult.programa : (n ? 'general' : S.active);
+      recompute(); render(); mostrarPendiente();
+    }
+    list.forEach(function(f, k){
       var rd = new FileReader();
       rd.onload = function(){
-        try{
-          var found = Core.readFile(XLSX, rd.result, f.name);
-          found.forEach(function(p){
-            var i = S.progs.findIndex(function(x){ return x.programa===p.programa; });
-            if (i>=0){ S.progs[i]=p; say('warn', '“'+p.programa+'” ya estaba cargado; lo reemplacé con '+f.name+'.'); }
-            else S.progs.push(p);
-            say('ok', f.name+': '+p.recs.length+' órdenes leídas de “'+p.programa+'”.');
-          });
-          if (found.length===1) S.active = found[0].programa;
-        } catch(e){ say('err', f.name+': '+(e && e.message ? e.message : 'no se pudo leer el archivo.')); }
-        if (--pending===0){ if (S.progs.length>1) S.active='general'; recompute(); render(); }
+        try{ res[k] = { found: Core.readFile(XLSX, rd.result, f.name) }; }
+        catch(e){ res[k] = { err: (e && e.message ? e.message : 'no se pudo leer el archivo.') }; }
+        if (--pending===0) terminar();
       };
-      rd.onerror = function(){ say('err', f.name+': no se pudo abrir.'); if (--pending===0){ recompute(); render(); } };
+      rd.onerror = function(){ res[k] = { err:'no se pudo abrir.' }; if (--pending===0) terminar(); };
       rd.readAsArrayBuffer(f);
     });
   }
@@ -2140,15 +2157,11 @@ if (typeof module!=='undefined') module.exports = Core;
     var d=new Date(), fuente='Pegado '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
     try{
       var found = Core.readPaste(XLSX, html, text, fuente);
-      found.forEach(function(p){
-        var i = S.progs.findIndex(function(x){ return x.programa===p.programa; });
-        if (i>=0){ S.progs[i]=p; say('warn','“'+p.programa+'” ya estaba cargado; lo reemplacé con lo que acabas de pegar.'); }
-        else S.progs.push(p);
-        say('ok','Pegado: '+p.recs.length+' órdenes de “'+p.programa+'”.');
-      });
-      S.active = found.length===1 ? found[0].programa : 'general';
+      var ult = null;
+      found.forEach(function(p){ var r = incorporar(p); if (r) ult = r; });
+      if (found.length===1 && ult) S.active = ult.programa; else if (found.length>1) S.active='general';
       var box=$('paste'); box.classList.add('flash'); setTimeout(function(){ box.classList.remove('flash'); },900);
-      recompute(); render();
+      recompute(); render(); mostrarPendiente();
     } catch(e){
       say('err','No pude leer lo que pegaste: '+(e&&e.message?e.message:'formato no reconocido')+' Asegúrate de copiar la tabla completa, incluida la fila de encabezados (numeroordenpago, numerodocumento…).');
     }
@@ -2165,7 +2178,73 @@ if (typeof module!=='undefined') module.exports = Core;
 
   function say(kind, text){ var d=document.createElement('div'); d.className='msg '+kind; d.textContent=text; $('msgs').appendChild(d); }
 
-  function recompute(){ S.progs.forEach(function(p){ p.res = Core.build(p.recs, S.corte); }); }
+  /* Cada programa guarda sus fuentes (un informe por periodo). Un mismo nombre con otro periodo
+     nunca se une solo: la persona decide si es el mismo grupo aplazado o una cohorte distinta. */
+  S.pend = [];
+  function reconstruir(x){
+    x.recs = [].concat.apply([], x.fuentes.map(function(f){ return f.recs; }));
+    var per = {}; x.fuentes.forEach(function(f){ String(f.periodo||'').split(/,\s*/).forEach(function(v){ if (v) per[v]=1; }); });
+    var lista = Object.keys(per).sort();
+    x.periodos = lista; x.aplazado = x.fuentes.length>1;
+    x.periodo = lista.join(' y ');
+    x.archivo = x.fuentes.length>1 ? x.fuentes.map(function(f){ return f.archivo+' ('+(f.periodo||'s/d')+')'; }).join(' + ') : x.fuentes[0].archivo;
+  }
+  function incorporar(p){
+    p.nombre = p.programa;
+    var fuente = { periodo:p.periodo, archivo:p.archivo, recs:p.recs };
+    var mismos = S.progs.filter(function(x){ return x.nombre===p.nombre; });
+    var conPeriodo = mismos.find(function(x){ return x.fuentes.some(function(f){ return f.periodo===p.periodo; }); });
+    if (conPeriodo){
+      conPeriodo.fuentes = conPeriodo.fuentes.map(function(f){ return f.periodo===p.periodo ? fuente : f; });
+      reconstruir(conPeriodo);
+      say('warn','“'+p.nombre+'” (periodo '+(p.periodo||'s/d')+') ya estaba cargado; lo actualicé con el informe nuevo.');
+      return conPeriodo;
+    }
+    if (mismos.length){ S.pend.push({ p:p, fuente:fuente }); return null; }
+    p.fuentes = [fuente]; reconstruir(p); S.progs.push(p);
+    say('ok','Cargado: '+p.recs.length+' órdenes de “'+p.nombre+'”'+(p.periodo?' (periodo '+p.periodo+')':'')+'.');
+    return p;
+  }
+  /* Nombre visible único: si hay dos cohortes del mismo programa, se distinguen por periodo */
+  function etiquetar(){
+    var cuenta = {};
+    S.progs.forEach(function(x){ x.nombre = x.nombre || x.programa; cuenta[x.nombre]=(cuenta[x.nombre]||0)+1; });
+    S.progs.forEach(function(x){
+      var antes = x.programa;
+      x.programa = cuenta[x.nombre]>1 ? x.nombre+' · '+(x.periodo||'s/d') : x.nombre;
+      if (antes && antes!==x.programa){
+        if (S.active===antes) S.active=x.programa;
+        if (S.filt[antes]){ S.filt[x.programa]=S.filt[antes]; } if (S.sort[antes]){ S.sort[x.programa]=S.sort[antes]; }
+      }
+    });
+  }
+  function mostrarPendiente(){
+    var old = document.getElementById('pend'); if (old) old.remove();
+    if (!S.pend.length) return;
+    var it = S.pend[0], mismos = S.progs.filter(function(x){ return x.nombre===it.p.nombre; });
+    var box = document.createElement('div'); box.id='pend'; box.className='pend';
+    var h = '<p><b>“'+esc(it.p.nombre)+'”</b> ya está cargado con el periodo <b>'+esc(mismos.map(function(x){return x.periodo;}).join(' / '))+'</b>, y este informe es del periodo <b>'+esc(it.fuente.periodo||'s/d')+'</b>. ¿Qué hago?</p><div class="pend-b">';
+    mismos.forEach(function(x,i){ h+='<button class="btn btn-deep" data-u="'+i+'">Unir'+(mismos.length>1?' con '+esc(x.periodo):'')+'<small>Es el mismo grupo, el programa se aplazó</small></button>'; });
+    h+='<button class="btn btn-line" data-s="1">Separar<small>Es otra cohorte del programa</small></button></div>';
+    box.innerHTML = h;
+    $('msgs').prepend(box);
+    box.querySelectorAll('[data-u]').forEach(function(b){ b.onclick=function(){
+      var x = mismos[+b.getAttribute('data-u')]; x.fuentes.push(it.fuente); x.fuentes.sort(function(a,c){ return String(a.periodo).localeCompare(String(c.periodo)); }); reconstruir(x);
+      S.pend.shift(); S.active=x.programa; say('ok','Unido: “'+it.p.nombre+'” ahora incluye los periodos '+x.periodo+'.');
+      recompute(); render(); mostrarPendiente(); }; });
+    box.querySelector('[data-s]').onclick=function(){
+      var q = it.p; q.fuentes=[it.fuente]; reconstruir(q); S.progs.push(q);
+      S.pend.shift(); recompute(); S.active=q.programa; render(); mostrarPendiente();
+      say('ok','Separado: “'+q.programa+'” quedó como un programa aparte.'); };
+  }
+  function separarPeriodos(x){
+    var i = S.progs.indexOf(x); if (i<0) return;
+    var nuevos = x.fuentes.map(function(f){ var y={ nombre:x.nombre, programa:x.nombre, hoja:x.hoja, ignoradas:0, fuentes:[f] }; reconstruir(y); return y; });
+    S.progs.splice.apply(S.progs, [i,1].concat(nuevos));
+    S.active='general'; recompute(); render();
+    say('ok','“'+x.nombre+'” quedó separado en '+nuevos.length+' programas, uno por periodo.');
+  }
+  function recompute(){ etiquetar(); S.progs.forEach(function(p){ p.res = Core.build(p.recs, S.corte); }); }
   function totals(){
     var t={inscritos:0,total:0,pagada:{n:0,v:0},activa:{n:0,v:0},vencida:{n:0,v:0},otro:{n:0,v:0},descuento:0,anuladas:0,consolidadas:0,sinOrden:0,crudas:0};
     S.progs.forEach(function(p){ var s=p.res.stats;
@@ -2247,7 +2326,7 @@ if (typeof module!=='undefined') module.exports = Core;
   function descargarHTML(p){
     var lista = p ? [p] : S.progs;
     var data = { corte:S.corte, generado:new Date().toISOString(),
-      progs: lista.map(function(x){ return { programa:x.programa, periodo:x.periodo, archivo:x.archivo, hoja:x.hoja, ignoradas:x.ignoradas,
+      progs: lista.map(function(x){ return { programa:x.programa, nombre:x.nombre, periodo:x.periodo, periodos:x.periodos, aplazado:x.aplazado, archivo:x.archivo, hoja:x.hoja, ignoradas:x.ignoradas,
         recs: x.recs.map(function(r){ var c={}; for (var k in r) if (k!=='fechaLimiteRaw') c[k]=r[k]; return c; }) }; }) };
     var titulo = p ? p.programa : 'Consolidado de programas';
     var html = '<!DOCTYPE html>\n<html lang="es">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'+
@@ -2269,7 +2348,7 @@ if (typeof module!=='undefined') module.exports = Core;
       '<th rowspan="2" class="num bl">Valor total</th><th rowspan="2" class="num">Inscritos que pagaron</th><th rowspan="2" class="num">Valor recaudado</th><th rowspan="2">Composición del valor</th><th rowspan="2" class="num">Con descuento</th><th rowspan="2" class="num">Órdenes anuladas</th></tr><tr>'+
       '<th class="num bl">No.</th><th class="num">Valor</th><th class="num bl">No.</th><th class="num">Valor</th><th class="num bl">No.</th><th class="num">Valor</th></tr></thead><tbody>';
     S.progs.forEach(function(p,i){ var s=p.res.stats;
-      h+='<tr><td class="prog"><button data-i="'+i+'">'+esc(p.programa)+'</button>'+(p.periodo?'<span class="sub">Periodo '+esc(p.periodo)+'</span>':'')+'</td><td class="num">'+s.inscritos+'</td>'+
+      h+='<tr><td class="prog"><button data-i="'+i+'">'+esc(p.programa)+'</button>'+(p.periodo?'<span class="sub">'+(p.aplazado?'Aplazado: '+esc(p.periodos.join(' → ')):'Periodo '+esc(p.periodo))+'</span>':'')+'</td><td class="num">'+s.inscritos+'</td>'+
         '<td class="num bl">'+s.pagada.n+'</td><td class="num">'+money(s.pagada.v)+'</td>'+
         '<td class="num bl">'+s.activa.n+'</td><td class="num">'+money(s.activa.v)+'</td>'+
         '<td class="num bl">'+s.vencida.n+'</td><td class="num">'+money(s.vencida.v)+'</td>'+
@@ -2334,8 +2413,8 @@ if (typeof module!=='undefined') module.exports = Core;
     var r=p.res, s=r.stats, k=p.programa;
     var f = S.filt[k] || (S.filt[k]={estado:'Todos', q:''});
     var so = S.sort[k] || (S.sort[k]={by:null, dir:1});
-    var h='<section class="view"><div class="vhead"><div><h2>'+esc(k)+'</h2><div class="meta">Periodo '+esc(p.periodo||'s/d')+' · Archivo '+esc(p.archivo)+' · Corte al '+fdate(S.corte)+'</div></div>'+
-      '<div class="vactions">'+(SNAP?'':'<button class="btn btn-danger" id="rm">Quitar programa</button>')+dlMenu(p)+'</div></div>';
+    var h='<section class="view"><div class="vhead"><div><h2>'+esc(k)+'</h2><div class="meta">'+(p.aplazado?'<span class="tag">Programa aplazado</span> Periodos '+esc(p.periodos.join(' → ')):'Periodo '+esc(p.periodo||'s/d'))+' · Archivo '+esc(p.archivo)+' · Corte al '+fdate(S.corte)+'</div></div>'+
+      '<div class="vactions">'+(SNAP?'':(p.aplazado?'<button class="btn btn-line" id="sep">Separar periodos</button>':'')+'<button class="btn btn-danger" id="rm">Quitar programa</button>')+dlMenu(p)+'</div></div>';
     h+=figs(s);
     var rev=r.alerts.filter(function(a){ return a.indexOf('Revisar:')===0; });
     rev.forEach(function(a){ h+='<div class="msg warn noprint" style="margin:-8px 0 16px">'+esc(a)+'</div>'; });
@@ -2344,6 +2423,7 @@ if (typeof module!=='undefined') module.exports = Core;
     estados.forEach(function(e){ h+='<button class="chip" data-e="'+e+'" aria-pressed="'+(f.estado===e)+'">'+e+'</button>'; });
     h+='</div><div class="tbl-wrap"><table><thead><tr>';
     Core.COLS.forEach(function(c,i){ var arrow = so.by===FIELDS[i] ? (so.dir>0?' ▲':' ▼') : ''; h+='<th class="sort'+(i===5?' num':'')+'" data-f="'+FIELDS[i]+'">'+c+arrow+'</th>'; });
+    if (p.aplazado) h+='<th class="sort" data-f="periodo">Periodo'+(so.by==='periodo'?(so.dir>0?' ▲':' ▼'):'')+'</th>';
     h+='</tr></thead><tbody id="tb"></tbody><tfoot id="tf"></tfoot></table></div>';
     h+=tarifasHTML(s);
     h+='<div class="cols2"><div class="box"><h3>Resumen por Estado 2</h3><div class="tbl-wrap"><table><thead><tr><th>Estado 2</th><th class="num">No.</th><th class="num">% inscritos</th><th class="num">Valor</th></tr></thead><tbody>';
@@ -2354,9 +2434,10 @@ if (typeof module!=='undefined') module.exports = Core;
     h+='</tbody><tfoot><tr><td>Total</td><td class="num">'+s.inscritos+'</td></tr></tfoot></table></div></div></div>';
     // Depuración
     h+='<details class="log"><summary>Cómo se depuró: '+s.crudas+' órdenes crudas → '+s.inscritos+' inscritos'+(r.alerts.length?' · '+r.alerts.length+' observaciones':'')+'</summary><div class="in">'+
-      '<ol class="steps"><li>Se descartaron '+s.anuladas+' órdenes anuladas (“Anulada” y “Anula Plan de Pagos”).'+(s.sinOrden?' '+s.sinOrden+' persona'+(s.sinOrden>1?'s':'')+' quedaron sin ninguna orden válida y no aparecen en el informe.':'')+'</li>'+
+      '<ol class="steps"><li>Se descartaron '+s.anuladas+' órdenes anuladas (“Anulada” y “Anula Plan de Pagos”).'+(s.sinOrden?' '+s.sinOrden+(s.sinOrden>1?' personas quedaron':' persona quedó')+' sin ninguna orden válida y no aparece'+(s.sinOrden>1?'n':'')+' en el informe.':'')+'</li>'+
       '<li>Se dejó una sola orden por persona (documento). Se consolidaron '+s.consolidadas+' órdenes duplicadas: se conserva la pagada si existe; si no, la de menor valor (la del descuento); si empatan, la más reciente.</li>'+
       '<li>Estado 2: “Pagada” y “Pagada Plan de pagos” quedan como Pagada. “Activa” y “Activa Plan de Pagos” quedan como Activa si la fecha límite es igual o posterior al '+fdate(S.corte)+', y como Vencida si es anterior.</li>'+
+      (p.aplazado?'<li><b>Programa aplazado:</b> se unieron los informes de los periodos '+esc(p.periodos.join(' y '))+'. Si una persona tiene órdenes en varios periodos, se conserva la pagada; si ninguna está pagada, la del periodo más reciente.</li>':'')+
       '<li>Se conserva el orden en que las personas aparecen en el informe crudo. Los nombres se muestran con mayúscula inicial y se corrigen las tildes o eñes dañadas cuando la corrección es segura.</li></ol>';
     if (r.alerts.length){ h+='<strong>Observaciones</strong><ul>'; r.alerts.forEach(function(a){ h+='<li>'+esc(a)+'</li>'; }); h+='</ul>'; }
     if (r.log.length){ h+='<strong style="display:block;margin-top:12px">Órdenes que no pasan al informe ('+r.log.length+')</strong><div class="tbl-wrap" style="margin-top:6px"><table><thead><tr><th>No. Orden</th><th>Documento</th><th>Nombre</th><th>Estado plataforma</th><th>Concepto</th><th class="num">Valor</th><th>Motivo</th></tr></thead><tbody>';
@@ -2365,6 +2446,7 @@ if (typeof module!=='undefined') module.exports = Core;
     h+='</div></details></section>';
     $('view').innerHTML=h;
     wireMenu(p);
+    if ($('sep')) $('sep').onclick=function(){ if (confirm('¿Separar “'+p.nombre+'” en un programa por cada periodo?')) separarPeriodos(p); };
     if ($('rm')) $('rm').onclick=function(){ if (confirm('¿Quitar “'+k+'” del informe?')){ S.progs=S.progs.filter(function(x){return x!==p;}); S.active='general'; render(); } };
     $('q').oninput=function(){ f.q=this.value; fillRows(p); };
     $('view').querySelectorAll('.chip').forEach(function(c){ c.onclick=function(){ f.estado=c.getAttribute('data-e'); $('view').querySelectorAll('.chip').forEach(function(x){ x.setAttribute('aria-pressed', x===c); }); fillRows(p); }; });
@@ -2386,7 +2468,7 @@ if (typeof module!=='undefined') module.exports = Core;
     var rows=visibleRows(p), h='';
     rows.forEach(function(r){
       var cls = r.estado2==='Pagada'||r.estado2==='Activa'||r.estado2==='Vencida' ? r.estado2 : 'otro';
-      h+='<tr><td>'+r.orden+'</td><td>'+esc(r.documento)+'</td><td>'+fdate(r.fechaLimite)+'</td><td>'+esc(r.estado1)+'</td><td><span class="pill-e p-'+cls+'">'+esc(r.estado2)+'</span></td><td class="num">'+money(r.valor)+'</td><td>'+esc(r.nombre)+'</td><td>'+esc(r.correo)+'</td><td>'+esc(r.telefono)+'</td><td>'+esc(r.celular)+'</td></tr>';
+      h+='<tr><td>'+r.orden+'</td><td>'+esc(r.documento)+'</td><td>'+fdate(r.fechaLimite)+'</td><td>'+esc(r.estado1)+'</td><td><span class="pill-e p-'+cls+'">'+esc(r.estado2)+'</span></td><td class="num">'+money(r.valor)+'</td><td>'+esc(r.nombre)+'</td><td>'+esc(r.correo)+'</td><td>'+esc(r.telefono)+'</td><td>'+esc(r.celular)+'</td>'+(p.aplazado?'<td>'+esc(r.periodo)+'</td>':'')+'</tr>';
     });
     if (!rows.length) h='<tr><td colspan="10" class="empty">No hay inscritos con ese filtro.</td></tr>';
     $('tb').innerHTML=h;
@@ -2434,7 +2516,11 @@ if (typeof module!=='undefined') module.exports = Core;
   function xs(t){ return '"'+String(t).replace(/"/g,'""')+'"'; }
   function buildWorkbook(){
     var wb=XLSX.utils.book_new(), used={general:1,'depuración':1};
-    var names = S.progs.map(function(p){ return sheetName(p.programa,used); });
+    var names = S.progs.map(function(p){
+      if (p.programa===p.nombre && !p.aplazado) return sheetName(p.programa,used);
+      var suf = ' '+String(p.periodo||'').replace(/ y /g,'-');
+      return sheetName(String(p.nombre).replace(/[\[\]:*?\/\\]/g,' ').trim().slice(0,31-suf.length).trim()+suf, used);
+    });
     var DEP = "'Depuración'";
     // Hoja de depuración primero en memoria (sus filas se usan en las fórmulas de General)
     var d={}, DH=['Programa','No. Orden','Documento','Nombre','Estado en la plataforma','Concepto','Valor','Motivo'], dr=1;
@@ -2453,9 +2539,11 @@ if (typeof module!=='undefined') module.exports = Core;
       var ws={}, rows=p.res.rows, s=p.res.stats, n=rows.length, first=2, last=n+1; // filas de Excel (1-based)
       var cols=Core.COLS.concat(['Tipo de orden']);
       var fm=[F.INT,null,F.DATE,F.TXT,F.TXT,F.MONEY,F.TXT,F.TXT,F.INT,F.INT,F.TXT];
+      if (p.aplazado){ cols.push('Periodo'); fm.push(F.TXT); }
       cols.forEach(function(c,i){ setC(ws,0,i,c,'head'); });
       rows.forEach(function(r,j){
         var vals=[r.orden,r.documento,isoToDate(r.fechaLimite),r.estado1,r.estado2,r.valor,r.nombre,r.correo,r.telefono,r.celular, r.descuento?'Plan de pagos (con descuento)':'Matrícula'];
+        if (p.aplazado) vals.push(r.periodo);
         vals.forEach(function(v,i){ setC(ws,j+1,i,v, i===4 && ST[r.estado2] ? r.estado2 : 'cell', fm[i]); });
       });
       var E='$E$'+first+':$E$'+last, Fv='$F$'+first+':$F$'+last, A='$A$'+first+':$A$'+last;
@@ -2514,7 +2602,7 @@ if (typeof module!=='undefined') module.exports = Core;
       ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:TT+1,c:11}});
       ws['!cols']=[{wch:11},{wch:13},{wch:12},{wch:24},{wch:14},{wch:24},{wch:40},{wch:34},{wch:15},{wch:14},{wch:28},{wch:16}];
       ws['!rows']=[{hpt:22}];
-      ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:n,c:10}})};
+      ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:n,c:cols.length-1}})};
       progSheets.push({ws:ws,name:names[pi],first:first,last:last});
     });
     // Hoja General: cada cifra se calcula con fórmulas sobre la hoja de su programa
@@ -2678,6 +2766,7 @@ if (typeof module!=='undefined') module.exports = Core;
     'Correo':'Correo registrado en el sistema.',
     'Telefono':'Teléfono fijo registrado.',
     'Celular':'Celular registrado.',
+    'Periodo':'Periodo de la orden que quedó en el informe.',
     // Resúmenes
     'Resumen por Estado 2|No.':'Personas en ese estado de pago.',
     'Resumen por Estado 2|% inscritos':'Qué parte de los inscritos está en ese estado.',
@@ -2733,8 +2822,9 @@ if (typeof module!=='undefined') module.exports = Core;
 
   if (SNAP){
     S.progs = SNAP.progs || []; S.corte = SNAP.corte || S.corte; $('corte').value = S.corte;
-    S.active = S.progs.length===1 ? S.progs[0].programa : 'general';
+    S.progs.forEach(function(x){ x.periodos = x.periodos || (x.periodo ? [x.periodo] : []); });
     recompute();
+    S.active = S.progs.length===1 ? S.progs[0].programa : 'general';
     document.body.classList.add('snap');
     var g = new Date(SNAP.generado);
     $('btnXlsx').disabled = false;
@@ -2746,5 +2836,3 @@ if (typeof module!=='undefined') module.exports = Core;
 </script>
 </body>
 </html>
-
-</body></html>
