@@ -150,6 +150,15 @@ tfoot td{font-weight:900;background:var(--cyan-soft);color:var(--brand-deep);bor
 .pend-b{display:flex;gap:10px;flex-wrap:wrap}
 .pend-b .btn{display:flex;flex-direction:column;align-items:flex-start;border-radius:14px;padding:9px 16px;text-align:left}
 .pend-b small{font-weight:600;font-size:12px;opacity:.85}
+.uni .uni-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:8px;margin-bottom:14px}
+.uni label{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);border-radius:12px;cursor:pointer;background:var(--surface)}
+.uni label:has(input:checked){border-color:var(--brand);background:var(--cyan-soft)}
+.uni label span{flex:1;font-weight:600;font-size:14px}.uni label small{color:var(--muted);font-size:12px;white-space:nowrap}
+.uni input[type=checkbox]{width:17px;height:17px;accent-color:var(--brand)}
+.uni-f{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end;margin-bottom:14px}
+.uni-f .field{flex:1 1 320px;color:var(--ink)}.uni-f .field input{background:var(--soft);color:var(--ink);color-scheme:inherit}
+.uni-cats{flex:1 1 300px;font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tag-cat{background:var(--cyan-soft);color:var(--brand-deep)}
 .tag{display:inline-block;background:var(--warn-bg);color:var(--warn);font-weight:800;font-size:12px;border-radius:999px;padding:1px 9px;margin-right:4px}
 [hidden]{display:none!important}
 .dl{position:relative}
@@ -1971,7 +1980,9 @@ var Core = (function(){
         return b.orden-a.orden;
       });
       var sel = validas[0];
-      validas.slice(1).forEach(function(r){ nConsolidadas++; log.push({r:r, motivo:(r.periodo && sel.periodo && r.periodo!==sel.periodo ? 'Orden del periodo '+r.periodo+' (programa aplazado)' : 'Orden duplicada de la misma persona')+'; se conserva la No. '+sel.orden+(r.periodo!==sel.periodo && sel.periodo ? ' del periodo '+sel.periodo : '')+' ('+sel.estadoPlataforma+', $'+fmtN(sel.valor)+')'}); });
+      validas.slice(1).forEach(function(r){ nConsolidadas++; log.push({r:r, motivo:(r.categoria && sel.categoria && r.categoria!==sel.categoria ? 'Orden de la categoría “'+r.categoria+'”' : r.periodo && sel.periodo && r.periodo!==sel.periodo ? 'Orden del periodo '+r.periodo+' (programa aplazado)' : 'Orden duplicada de la misma persona')+'; se conserva la No. '+sel.orden+(r.periodo!==sel.periodo && sel.periodo ? ' del periodo '+sel.periodo : '')+' ('+sel.estadoPlataforma+', $'+fmtN(sel.valor)+')'}); });
+      var cats = {}; validas.forEach(function(r){ if (r.categoria) cats[r.categoria]=1; });
+      if (Object.keys(cats).length>1) alerts.push('Revisar: '+(sel.nombre||'')+' (documento '+sel.documento+') tiene órdenes vigentes en varias categorías ('+Object.keys(cats).join(', ')+'). En el informe quedó en “'+sel.categoria+'”.');
       var pendientes = validas.filter(function(r){ return tipoEstado(r.estadoPlataforma)!=='pagada' && (+r.periodo||0) >= (+sel.periodo||0); });
       if (tipoEstado(sel.estadoPlataforma)==='pagada' && pendientes.length) alerts.push('Revisar: '+(sel.nombre||'')+' (documento '+sel.documento+') tiene al mismo tiempo órdenes pagadas y sin pagar ('+validas.map(function(r){return 'No. '+r.orden+' '+r.estadoPlataforma+' $'+fmtN(r.valor);}).join(', ')+'). En el informe quedó la pagada.');
       if (/prueba|test|ejemplo/i.test(sel.correo||'') || /(.)\1{4,}/i.test(String(sel.nombre||'').replace(/\s/g,'')))
@@ -1988,7 +1999,7 @@ var Core = (function(){
         orden: sel.orden, documento: sel.documento, fechaLimite: sel.fechaLimite, estado1: sel.estado1, estado2: e2,
         valor: sel.valor, nombre: sel.nombre, correo: sel.correo, telefono: sel.telefono, celular: sel.celular,
         descuento: /plan/i.test(sel.concepto) || /plan/i.test(sel.estadoPlataforma),
-        estadoPlataforma: sel.estadoPlataforma, fechaPago: sel.fechaPago, periodo: sel.periodo
+        estadoPlataforma: sel.estadoPlataforma, fechaPago: sel.fechaPago, periodo: sel.periodo, fechaCreacion: sel.fechaCreacion, categoria: sel.categoria || null
       });
     });
     if (reparados.length) alerts.push('Se corrigieron automáticamente tildes o eñes dañadas en '+reparados.length+' nombre'+(reparados.length>1?'s':'')+' (verifícalos): '+reparados.join('; ')+'.');
@@ -2011,6 +2022,15 @@ var Core = (function(){
     s.pctRecaudo = s.total ? s.pagada.v/s.total : 0;
     s.pctPagadas = s.inscritos ? s.pagada.n/s.inscritos : 0;
     s.tarifas = tarifas(rows);
+    /* Resumen por categoría (solo en eventos unificados) */
+    var cm = {}, corden = [];
+    rows.forEach(function(r){
+      if (!r.categoria) return;
+      var c = cm[r.categoria] || (cm[r.categoria] = { nombre:r.categoria, inscritos:0, total:0, pag:{n:0,v:0} });
+      if (c.inscritos===0) corden.push(r.categoria);
+      c.inscritos++; c.total += r.valor; if (r.estado2==='Pagada'){ c.pag.n++; c.pag.v += r.valor; }
+    });
+    s.categorias = corden.map(function(k){ return cm[k]; });
     return s;
   }
   /* Resumen por tarifa: agrupa por el valor de la orden conservada */
@@ -2193,20 +2213,26 @@ if (typeof module!=='undefined') module.exports = Core;
      nunca se une solo: la persona decide si es el mismo grupo aplazado o una cohorte distinta. */
   S.pend = [];
   function reconstruir(x){
+    x.fuentes.forEach(function(f){ f.recs.forEach(function(r){ if (f.categoria) r.categoria = f.categoria; else delete r.categoria; }); });
     x.recs = [].concat.apply([], x.fuentes.map(function(f){ return f.recs; }));
     var per = {}; x.fuentes.forEach(function(f){ String(f.periodo||'').split(/,\s*/).forEach(function(v){ if (v) per[v]=1; }); });
     var lista = Object.keys(per).sort();
-    x.periodos = lista; x.aplazado = x.fuentes.length>1;
+    var cats = []; x.fuentes.forEach(function(f){ if (f.categoria && cats.indexOf(f.categoria)<0) cats.push(f.categoria); });
+    x.periodos = lista; x.aplazado = lista.length>1;
+    x.listaCat = cats; x.categorias = cats.length>1;
     x.periodo = lista.join(' y ');
-    x.archivo = x.fuentes.length>1 ? x.fuentes.map(function(f){ return f.archivo+' ('+(f.periodo||'s/d')+')'; }).join(' + ') : x.fuentes[0].archivo;
+    x.archivo = x.fuentes.length>1 ? x.fuentes.map(function(f){ return f.archivo+' ('+(f.categoria||f.periodo||'s/d')+')'; }).join(' + ') : x.fuentes[0].archivo;
   }
+  /* ¿Este programa contiene el informe original "nombre"? (directo, aplazado o como categoría de un evento) */
+  function contiene(x, nombre){ return x.nombre===nombre || x.fuentes.some(function(f){ return f.nombre===nombre; }); }
   function incorporar(p){
     p.nombre = p.programa;
-    var fuente = { periodo:p.periodo, archivo:p.archivo, recs:p.recs };
-    var mismos = S.progs.filter(function(x){ return x.nombre===p.nombre; });
-    var conPeriodo = mismos.find(function(x){ return x.fuentes.some(function(f){ return f.periodo===p.periodo; }); });
+    var fuente = { nombre:p.nombre, periodo:p.periodo, archivo:p.archivo, recs:p.recs };
+    var mismos = S.progs.filter(function(x){ return contiene(x, p.nombre); });
+    var igual = function(f){ return (f.nombre||'')===p.nombre && f.periodo===p.periodo; };
+    var conPeriodo = mismos.find(function(x){ return x.fuentes.some(igual); });
     if (conPeriodo){
-      conPeriodo.fuentes = conPeriodo.fuentes.map(function(f){ return f.periodo===p.periodo ? fuente : f; });
+      conPeriodo.fuentes = conPeriodo.fuentes.map(function(f){ if (igual(f)){ fuente.categoria = f.categoria; return fuente; } return f; });
       reconstruir(conPeriodo);
       say('warn','“'+p.nombre+'” (periodo '+(p.periodo||'s/d')+') ya estaba cargado; lo actualicé con el informe nuevo.');
       return conPeriodo;
@@ -2232,7 +2258,7 @@ if (typeof module!=='undefined') module.exports = Core;
   function mostrarPendiente(){
     var old = document.getElementById('pend'); if (old) old.remove();
     if (!S.pend.length) return;
-    var it = S.pend[0], mismos = S.progs.filter(function(x){ return x.nombre===it.p.nombre; });
+    var it = S.pend[0], mismos = S.progs.filter(function(x){ return contiene(x, it.p.nombre); });
     var box = document.createElement('div'); box.id='pend'; box.className='pend';
     var h = '<p><b>“'+esc(it.p.nombre)+'”</b> ya está cargado con el periodo <b>'+esc(mismos.map(function(x){return x.periodo;}).join(' / '))+'</b>, y este informe es del periodo <b>'+esc(it.fuente.periodo||'s/d')+'</b>. ¿Qué hago?</p><div class="pend-b">';
     mismos.forEach(function(x,i){ h+='<button class="btn btn-deep" data-u="'+i+'">Unir'+(mismos.length>1?' con '+esc(x.periodo):'')+'<small>Es el mismo grupo, el programa se aplazó</small></button>'; });
@@ -2240,7 +2266,9 @@ if (typeof module!=='undefined') module.exports = Core;
     box.innerHTML = h;
     $('msgs').prepend(box);
     box.querySelectorAll('[data-u]').forEach(function(b){ b.onclick=function(){
-      var x = mismos[+b.getAttribute('data-u')]; x.fuentes.push(it.fuente); x.fuentes.sort(function(a,c){ return String(a.periodo).localeCompare(String(c.periodo)); }); reconstruir(x);
+      var x = mismos[+b.getAttribute('data-u')];
+      var hermana = x.fuentes.find(function(f){ return f.nombre===it.p.nombre && f.categoria; }); if (hermana) it.fuente.categoria = hermana.categoria;
+      x.fuentes.push(it.fuente); x.fuentes.sort(function(a,c){ return String(a.periodo).localeCompare(String(c.periodo)); }); reconstruir(x);
       S.pend.shift(); S.active=x.programa; say('ok','Unido: “'+it.p.nombre+'” ahora incluye los periodos '+x.periodo+'.');
       recompute(); render(); mostrarPendiente(); }; });
     box.querySelector('[data-s]').onclick=function(){
@@ -2255,6 +2283,75 @@ if (typeof module!=='undefined') module.exports = Core;
     S.active='general'; recompute(); render();
     say('ok','“'+x.nombre+'” quedó separado en '+nuevos.length+' programas, uno por periodo.');
   }
+  /* ---------- Eventos con varias categorías ---------- */
+  var SEP = /^[\s\-–—:·,|/(]+|[\s\-–—:·,|/)]+$/g;
+  function palabras(t){ return String(t).split(/\s+/).filter(Boolean); }
+  function prefijoComun(nombres){
+    var ws = nombres.map(palabras), n = 0;
+    while (ws.every(function(w){ return w[n] && w[n].toLowerCase()===ws[0][n].toLowerCase(); })) n++;
+    return n;
+  }
+  function propuestaUnificar(progs){
+    var nombres = progs.map(function(x){ return x.nombre; });
+    var n = prefijoComun(nombres);
+    var base = palabras(nombres[0]).slice(0,n).join(' ').replace(SEP,'').replace(/\s+(de|del|la|las|el|los|en|y|para|con|a)$/i,'').trim();
+    var cats = progs.map(function(x){
+      var resto = palabras(x.nombre).slice(n).join(' ').replace(SEP,'').trim();
+      return (n>=2 && resto) ? resto.charAt(0).toUpperCase()+resto.slice(1) : x.nombre;
+    });
+    var vistos = {}; cats = cats.map(function(c,i){ if (vistos[c]){ return nombres[i]; } vistos[c]=1; return c; });
+    return { nombre: (n>=2 && base) ? base : nombres[0]+' (unificado)', cats: cats };
+  }
+  function unificar(progs, nombre, cats){
+    var i = S.progs.indexOf(progs[0]);
+    var fuentes = [];
+    progs.forEach(function(x,k){ x.fuentes.forEach(function(f){ f.nombre = f.nombre || x.nombre; f.categoria = f.categoria || cats[k]; fuentes.push(f); }); });
+    var y = { nombre:nombre, programa:nombre, hoja:progs[0].hoja, ignoradas:0, fuentes:fuentes };
+    reconstruir(y);
+    S.progs = S.progs.filter(function(x){ return progs.indexOf(x)<0; });
+    S.progs.splice(Math.min(i, S.progs.length), 0, y);
+    recompute(); S.active = y.programa; render();
+    say('ok','Unificado: “'+nombre+'” reúne '+progs.length+' categorías ('+cats.join(', ')+').');
+  }
+  function separarCategorias(x){
+    var i = S.progs.indexOf(x); if (i<0) return;
+    var grupos = {}, orden = [];
+    x.fuentes.forEach(function(f){ var k=f.nombre||x.nombre; if (!grupos[k]){ grupos[k]=[]; orden.push(k); } delete f.categoria; grupos[k].push(f); });
+    var nuevos = orden.map(function(k){ var y={ nombre:k, programa:k, hoja:x.hoja, ignoradas:0, fuentes:grupos[k] }; reconstruir(y); return y; });
+    S.progs.splice.apply(S.progs, [i,1].concat(nuevos));
+    S.active='general'; recompute(); render();
+    say('ok','“'+x.nombre+'” quedó separado en '+nuevos.length+' programas, uno por categoría.');
+  }
+  function panelUnificar(){
+    var old = $('uni'); if (old){ old.remove(); return; }
+    var cand = S.progs;
+    var box = document.createElement('div'); box.id='uni'; box.className='pend uni';
+    var h = '<p><b>Unificar categorías de un evento.</b> Marca las categorías que pertenecen al mismo evento; quedarán en un solo informe con la columna “Categoría”.</p><div class="uni-list">';
+    cand.forEach(function(x,i){ h+='<label><input type="checkbox" data-i="'+i+'"><span>'+esc(x.programa)+'</span><small>'+x.res.stats.inscritos+' inscritos</small></label>'; });
+    h+='</div><div class="uni-f"><label class="field">Nombre del informe unificado<input type="text" id="uniNombre" placeholder="Marca al menos dos categorías"></label><div id="uniCats" class="uni-cats"></div></div>'+
+      '<div class="pend-b"><button class="btn btn-deep" id="uniOk" disabled>Unificar</button><button class="btn btn-line" id="uniNo">Cancelar</button></div>';
+    box.innerHTML = h;
+    var vh = $('view').querySelector('.vhead'); vh.parentNode.insertBefore(box, vh.nextSibling);
+    var editado = false, prop = null;
+    function sel(){ return Array.prototype.slice.call(box.querySelectorAll('input[type=checkbox]:checked')).map(function(c){ return cand[+c.getAttribute('data-i')]; }); }
+    function actualizar(){
+      var xs = sel(); $('uniOk').disabled = xs.length<2;
+      if (xs.length<2){ $('uniCats').innerHTML=''; if (!editado) $('uniNombre').value=''; prop=null; return; }
+      prop = propuestaUnificar(xs);
+      if (!editado) $('uniNombre').value = prop.nombre;
+      $('uniCats').innerHTML = 'Categorías: '+prop.cats.map(function(c){ return '<span class="pill-e p-otro">'+esc(c)+'</span>'; }).join(' ');
+    }
+    box.querySelectorAll('input[type=checkbox]').forEach(function(c){ c.onchange = actualizar; });
+    $('uniNombre').oninput = function(){ editado = !!this.value.trim(); };
+    $('uniNo').onclick = function(){ box.remove(); };
+    $('uniOk').onclick = function(){
+      var xs = sel(); if (xs.length<2 || !prop) return;
+      var nombre = $('uniNombre').value.trim() || prop.nombre;
+      if (S.progs.some(function(x){ return xs.indexOf(x)<0 && x.nombre===nombre; })){ alert('Ya hay un programa llamado “'+nombre+'”. Usa otro nombre.'); return; }
+      unificar(xs, nombre, prop.cats);
+    };
+  }
+
   function recompute(){ etiquetar(); S.progs.forEach(function(p){ p.res = Core.build(p.recs, S.corte); }); }
   function totals(){
     var t={inscritos:0,total:0,pagada:{n:0,v:0},activa:{n:0,v:0},vencida:{n:0,v:0},otro:{n:0,v:0},descuento:0,anuladas:0,consolidadas:0,sinOrden:0,crudas:0};
@@ -2337,7 +2434,7 @@ if (typeof module!=='undefined') module.exports = Core;
   function descargarHTML(p){
     var lista = p ? [p] : S.progs;
     var data = { corte:S.corte, generado:new Date().toISOString(),
-      progs: lista.map(function(x){ return { programa:x.programa, nombre:x.nombre, periodo:x.periodo, periodos:x.periodos, aplazado:x.aplazado, archivo:x.archivo, hoja:x.hoja, ignoradas:x.ignoradas,
+      progs: lista.map(function(x){ return { programa:x.programa, nombre:x.nombre, periodo:x.periodo, periodos:x.periodos, aplazado:x.aplazado, categorias:x.categorias, listaCat:x.listaCat, archivo:x.archivo, hoja:x.hoja, ignoradas:x.ignoradas,
         recs: x.recs.map(function(r){ var c={}; for (var k in r) if (k!=='fechaLimiteRaw') c[k]=r[k]; return c; }) }; }) };
     var titulo = p ? p.programa : 'Consolidado de programas';
     var html = '<!DOCTYPE html>\n<html lang="es">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'+
@@ -2351,7 +2448,7 @@ if (typeof module!=='undefined') module.exports = Core;
   function renderGeneral(){
     var t = totals();
     var h = '<section class="view"><div class="vhead"><div><h2>Consolidado de programas</h2><div class="meta">Corte al '+fdate(S.corte)+' · '+S.progs.length+' programa'+(S.progs.length>1?'s':'')+' · '+t.crudas+' órdenes crudas depuradas a '+t.inscritos+' inscritos</div></div>'+
-      '<div class="vactions">'+dlMenu(null)+'</div></div>';
+      '<div class="vactions">'+(!SNAP && S.progs.length>1 ? '<button class="btn btn-line" id="uniBtn">Unificar categorías</button>' : '')+dlMenu(null)+'</div></div>';
     h += figs(t);
     h += '<div class="tbl-wrap"><table class="gen"><thead><tr>'+
       '<th rowspan="2">Programa</th><th rowspan="2" class="num">Inscritos</th>'+
@@ -2378,6 +2475,7 @@ if (typeof module!=='undefined') module.exports = Core;
     h+='</section>';
     $('view').innerHTML=h;
     wireMenu(null);
+    if ($('uniBtn')) $('uniBtn').onclick = panelUnificar;
     $('view').querySelectorAll('td.prog button').forEach(function(b){ b.onclick=function(){ S.active=S.progs[+b.getAttribute('data-i')].programa; render(); window.scrollTo(0,0); }; });
   }
 
@@ -2424,19 +2522,19 @@ if (typeof module!=='undefined') module.exports = Core;
     var r=p.res, s=r.stats, k=p.programa;
     var f = S.filt[k] || (S.filt[k]={estado:'Todos', q:''});
     var so = S.sort[k] || (S.sort[k]={by:null, dir:1});
-    var h='<section class="view"><div class="vhead"><div><h2>'+esc(k)+'</h2><div class="meta">'+(p.aplazado?'<span class="tag">Programa aplazado</span> Periodos '+esc(p.periodos.join(' → ')):'Periodo '+esc(p.periodo||'s/d'))+' · Archivo '+esc(p.archivo)+' · Corte al '+fdate(S.corte)+'</div></div>'+
-      '<div class="vactions">'+(SNAP?'':(p.aplazado?'<button class="btn btn-line" id="sep">Separar periodos</button>':'')+'<button class="btn btn-danger" id="rm">Quitar programa</button>')+dlMenu(p)+'</div></div>';
+    var h='<section class="view"><div class="vhead"><div><h2>'+esc(k)+'</h2><div class="meta">'+(p.categorias?'<span class="tag tag-cat">Evento con '+p.listaCat.length+' categorías</span> ':'')+(p.aplazado?'<span class="tag">Programa aplazado</span> Periodos '+esc(p.periodos.join(' → ')):'Periodo '+esc(p.periodo||'s/d'))+' · Archivo '+esc(p.archivo)+' · Corte al '+fdate(S.corte)+'</div></div>'+
+      '<div class="vactions">'+(SNAP?'':(p.categorias?'<button class="btn btn-line" id="sepc">Separar categorías</button>':p.aplazado?'<button class="btn btn-line" id="sep">Separar periodos</button>':'')+'<button class="btn btn-danger" id="rm">Quitar programa</button>')+dlMenu(p)+'</div></div>';
     h+=figs(s);
     var rev=r.alerts.filter(function(a){ return a.indexOf('Revisar:')===0; });
     rev.forEach(function(a){ h+='<div class="msg warn noprint" style="margin:-8px 0 16px">'+esc(a)+'</div>'; });
     var estados=['Todos','Pagada','Activa','Vencida'];
-    h+='<div class="tools"><input type="search" id="q" placeholder="Buscar por nombre, documento, orden o correo" value="'+esc(f.q)+'" aria-label="Buscar">';
+    h+='<div class="tools"><input type="search" id="q" placeholder="Buscar por nombre, documento, orden, correo'+(p.categorias?' o categoría':'')+'" value="'+esc(f.q)+'" aria-label="Buscar">';
     estados.forEach(function(e){ h+='<button class="chip" data-e="'+e+'" aria-pressed="'+(f.estado===e)+'">'+e+'</button>'; });
     h+='</div><div class="tbl-wrap"><table><thead><tr>';
-    Core.COLS.forEach(function(c,i){ var arrow = so.by===FIELDS[i] ? (so.dir>0?' ▲':' ▼') : ''; h+='<th class="sort'+(i===5?' num':'')+'" data-f="'+FIELDS[i]+'">'+c+arrow+'</th>'; });
-    if (p.aplazado) h+='<th class="sort" data-f="periodo">Periodo'+(so.by==='periodo'?(so.dir>0?' ▲':' ▼'):'')+'</th>';
+    colsDetalle(p).forEach(function(c){ var arrow = so.by===c[0] ? (so.dir>0?' ▲':' ▼') : ''; h+='<th class="sort'+(c[0]==='valor'?' num':'')+'" data-f="'+c[0]+'">'+c[1]+arrow+'</th>'; });
     h+='</tr></thead><tbody id="tb"></tbody><tfoot id="tf"></tfoot></table></div>';
     h+=tarifasHTML(s);
+    if (p.categorias) h+=categoriasHTML(s);
     h+='<div class="cols2"><div class="box"><h3>Resumen por Estado 2</h3><div class="tbl-wrap"><table><thead><tr><th>Estado 2</th><th class="num">No.</th><th class="num">% inscritos</th><th class="num">Valor</th></tr></thead><tbody>';
     [['Pagada','pagada'],['Activa','activa'],['Vencida','vencida'],['Otro','otro']].forEach(function(x){ if (x[1]!=='otro' || s.otro.n) h+='<tr><td><span class="pill-e p-'+(x[1]==='otro'?'otro':x[0])+'">'+x[0]+'</span></td><td class="num">'+s[x[1]].n+'</td><td class="num">'+pct(s.inscritos? s[x[1]].n/s.inscritos:0)+'</td><td class="num">'+money(s[x[1]].v)+'</td></tr>'; });
     h+='</tbody><tfoot><tr><td>Total</td><td class="num">'+s.inscritos+'</td><td class="num">100%</td><td class="num">'+money(s.total)+'</td></tr></tfoot></table></div></div>';
@@ -2448,6 +2546,7 @@ if (typeof module!=='undefined') module.exports = Core;
       '<ol class="steps"><li>Se descartaron '+s.anuladas+' órdenes anuladas (“Anulada” y “Anula Plan de Pagos”).'+(s.sinOrden?' '+s.sinOrden+(s.sinOrden>1?' personas quedaron':' persona quedó')+' sin ninguna orden válida y no aparece'+(s.sinOrden>1?'n':'')+' en el informe.':'')+'</li>'+
       '<li>Se dejó una sola orden por persona (documento). Se consolidaron '+s.consolidadas+' órdenes duplicadas: se conserva la pagada si existe; si no, la de menor valor (la del descuento); si empatan, la más reciente.</li>'+
       '<li>Estado 2: “Pagada” y “Pagada Plan de pagos” quedan como Pagada. “Activa” y “Activa Plan de Pagos” quedan como Activa si la fecha límite es igual o posterior al '+fdate(S.corte)+', y como Vencida si es anterior.</li>'+
+      (p.categorias?'<li><b>Evento con categorías:</b> se unificaron los informes de '+p.listaCat.length+' categorías ('+esc(p.listaCat.join(', '))+'). Cada persona cuenta una sola vez; si aparece en varias categorías, se conserva la orden pagada y queda una observación para revisar.</li>':'')+
       (p.aplazado?'<li><b>Programa aplazado:</b> se unieron los informes de los periodos '+esc(p.periodos.join(' y '))+'. Si una persona tiene órdenes en varios periodos, se conserva la pagada; si ninguna está pagada, la del periodo más reciente.</li>':'')+
       '<li>Se conserva el orden en que las personas aparecen en el informe crudo. Los nombres se muestran con mayúscula inicial y se corrigen las tildes o eñes dañadas cuando la corrección es segura.</li></ol>';
     if (r.alerts.length){ h+='<strong>Observaciones</strong><ul>'; r.alerts.forEach(function(a){ h+='<li>'+esc(a)+'</li>'; }); h+='</ul>'; }
@@ -2457,6 +2556,7 @@ if (typeof module!=='undefined') module.exports = Core;
     h+='</div></details></section>';
     $('view').innerHTML=h;
     wireMenu(p);
+    if ($('sepc')) $('sepc').onclick=function(){ if (confirm('¿Separar “'+p.nombre+'” en un programa por cada categoría?')) separarCategorias(p); };
     if ($('sep')) $('sep').onclick=function(){ if (confirm('¿Separar “'+p.nombre+'” en un programa por cada periodo?')) separarPeriodos(p); };
     if ($('rm')) $('rm').onclick=function(){ if (confirm('¿Quitar “'+k+'” del informe?')){ S.progs=S.progs.filter(function(x){return x!==p;}); S.active='general'; render(); } };
     $('q').oninput=function(){ f.q=this.value; fillRows(p); };
@@ -2470,21 +2570,48 @@ if (typeof module!=='undefined') module.exports = Core;
     var rows=p.res.rows.filter(function(r){
       if (f.estado!=='Todos' && r.estado2!==f.estado) return false;
       if (!q) return true;
-      return [r.orden,r.documento,r.nombre,r.correo,r.telefono,r.celular].join(' ').toLowerCase().indexOf(q)>=0;
+      return [r.orden,r.documento,r.nombre,r.correo,r.telefono,r.celular,r.categoria||''].join(' ').toLowerCase().indexOf(q)>=0;
     });
     if (so.by){ rows=rows.slice().sort(function(a,b){ var x=a[so.by], y=b[so.by]; if (x==null) return 1; if (y==null) return -1; return (typeof x==='number'&&typeof y==='number'? x-y : String(x).localeCompare(String(y),'es'))*so.dir; }); }
     return rows;
   }
+  /* Columnas del detalle: [campo, encabezado] */
+  function colsDetalle(p){
+    var c = [['orden','No. Orden'],['documento','Documento'],['fechaCreacion','Fecha creación'],['fechaLimite','Fecha limite'],['estado1','Estado 1'],['estado2','Estado 2'],['valor','Valor'],['nombre','Nombre']];
+    if (p.categorias) c.push(['categoria','Categoría']);
+    c.push(['correo','Correo'],['telefono','Telefono'],['celular','Celular']);
+    if (p.aplazado) c.push(['periodo','Periodo']);
+    return c;
+  }
+  function celda(f, r){
+    if (f==='estado2'){ var cls = r.estado2==='Pagada'||r.estado2==='Activa'||r.estado2==='Vencida' ? r.estado2 : 'otro'; return '<td><span class="pill-e p-'+cls+'">'+esc(r.estado2)+'</span></td>'; }
+    if (f==='valor') return '<td class="num">'+money(r.valor)+'</td>';
+    if (f==='fechaLimite' || f==='fechaCreacion') return '<td>'+fdate(r[f])+'</td>';
+    if (f==='orden') return '<td>'+r.orden+'</td>';
+    return '<td>'+esc(r[f])+'</td>';
+  }
   function fillRows(p){
-    var rows=visibleRows(p), h='';
-    rows.forEach(function(r){
-      var cls = r.estado2==='Pagada'||r.estado2==='Activa'||r.estado2==='Vencida' ? r.estado2 : 'otro';
-      h+='<tr><td>'+r.orden+'</td><td>'+esc(r.documento)+'</td><td>'+fdate(r.fechaLimite)+'</td><td>'+esc(r.estado1)+'</td><td><span class="pill-e p-'+cls+'">'+esc(r.estado2)+'</span></td><td class="num">'+money(r.valor)+'</td><td>'+esc(r.nombre)+'</td><td>'+esc(r.correo)+'</td><td>'+esc(r.telefono)+'</td><td>'+esc(r.celular)+'</td>'+(p.aplazado?'<td>'+esc(r.periodo)+'</td>':'')+'</tr>';
-    });
-    if (!rows.length) h='<tr><td colspan="10" class="empty">No hay inscritos con ese filtro.</td></tr>';
+    var rows=visibleRows(p), cols=colsDetalle(p), h='';
+    rows.forEach(function(r){ h+='<tr>'+cols.map(function(c){ return celda(c[0], r); }).join('')+'</tr>'; });
+    if (!rows.length) h='<tr><td colspan="'+cols.length+'" class="empty">No hay inscritos con ese filtro.</td></tr>';
     $('tb').innerHTML=h;
     var sum=rows.reduce(function(a,r){return a+r.valor;},0);
-    $('tf').innerHTML='<tr><td>Total</td><td></td><td></td><td></td><td>'+rows.length+'</td><td class="num">'+money(sum)+'</td><td colspan="4"></td></tr>';
+    $('tf').innerHTML='<tr>'+cols.map(function(c,i){
+      if (i===0) return '<td>Total</td>';
+      if (c[0]==='estado2') return '<td>'+rows.length+'</td>';
+      if (c[0]==='valor') return '<td class="num">'+money(sum)+'</td>';
+      return '<td></td>';
+    }).join('')+'</tr>';
+  }
+  function categoriasHTML(s){
+    var h='<div class="box" style="margin-top:24px"><h3>Pagos por categoría</h3><div class="tbl-wrap"><table class="gen"><thead><tr><th>Categoría</th><th class="num">Inscritos</th><th class="num">Pagaron</th><th class="num">Valor pagado</th><th class="num">% que ya pagó</th><th class="num">Por pagar</th></tr></thead><tbody>';
+    var t={i:0,n:0,v:0,p:0};
+    s.categorias.forEach(function(c){
+      t.i+=c.inscritos; t.n+=c.pag.n; t.v+=c.pag.v; t.p+=c.total-c.pag.v;
+      h+='<tr><td><b>'+esc(c.nombre)+'</b></td><td class="num">'+c.inscritos+'</td><td class="num c-pag"><b>'+c.pag.n+'</b></td><td class="num">'+money(c.pag.v)+'</td><td class="num pct">'+pct(c.inscritos?c.pag.n/c.inscritos:0)+'</td><td class="num">'+money(c.total-c.pag.v)+'</td></tr>';
+    });
+    h+='</tbody><tfoot><tr><td>Total</td><td class="num">'+t.i+'</td><td class="num">'+t.n+'</td><td class="num">'+money(t.v)+'</td><td class="num">'+pct(t.i?t.n/t.i:0)+'</td><td class="num">'+money(t.p)+'</td></tr></tfoot></table></div></div>';
+    return h;
   }
 
   /* ---------- Exportar a Excel ---------- */
@@ -2548,12 +2675,16 @@ if (typeof module!=='undefined') module.exports = Core;
     var progSheets=[];
     S.progs.forEach(function(p,pi){
       var ws={}, rows=p.res.rows, s=p.res.stats, n=rows.length, first=2, last=n+1; // filas de Excel (1-based)
-      var cols=Core.COLS.concat(['Tipo de orden']);
-      var fm=[F.INT,null,F.DATE,F.TXT,F.TXT,F.MONEY,F.TXT,F.TXT,F.INT,F.INT,F.TXT];
+      var cols=Core.COLS.concat(['Tipo de orden','Fecha de creación de la orden']);
+      var fm=[F.INT,null,F.DATE,F.TXT,F.TXT,F.MONEY,F.TXT,F.TXT,F.INT,F.INT,F.TXT,F.DATE];
+      var iCat = -1;
+      if (p.categorias){ iCat = cols.length; cols.push('Categoría'); fm.push(F.TXT); }
       if (p.aplazado){ cols.push('Periodo'); fm.push(F.TXT); }
       cols.forEach(function(c,i){ setC(ws,0,i,c,'head'); });
       rows.forEach(function(r,j){
         var vals=[r.orden,r.documento,isoToDate(r.fechaLimite),r.estado1,r.estado2,r.valor,r.nombre,r.correo,r.telefono,r.celular, r.descuento?'Plan de pagos (con descuento)':'Matrícula'];
+        vals.push(isoToDate(r.fechaCreacion));
+        if (p.categorias) vals.push(r.categoria);
         if (p.aplazado) vals.push(r.periodo);
         vals.forEach(function(v,i){ setC(ws,j+1,i,v, i===4 && ST[r.estado2] ? r.estado2 : 'cell', fm[i]); });
       });
@@ -2610,8 +2741,35 @@ if (typeof module!=='undefined') module.exports = Core;
       setC(ws,TT,11,{f:'SUM(L'+t1+':L'+t2+')',v:s.total-s.pagada.v},'tot',F.MONEY);
       setC(ws,TT+1,4,'Control','cell');
       setC(ws,TT+1,5,{f:'IF(AND(G'+ttx+'=COUNTA('+A+'),H'+ttx+'=COUNTIF('+E+',"Pagada"),I'+ttx+'=SUMIF('+E+',"Pagada",'+Fv+')),"Cuadra","Revisar")',v:'Cuadra'},'cell',F.GEN);
-      ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:TT+1,c:11}});
-      ws['!cols']=[{wch:11},{wch:13},{wch:12},{wch:24},{wch:14},{wch:24},{wch:40},{wch:34},{wch:15},{wch:14},{wch:28},{wch:16}];
+      var ultimaFila = TT+1;
+      // Pagos por categoría (eventos unificados): fórmulas sobre la columna Categoría del detalle
+      if (p.categorias && iCat>=0){
+        var CC = XLSX.utils.encode_col(iCat), CAT = '$'+CC+'$'+first+':$'+CC+'$'+last;
+        var K0 = TT+3;
+        ['Categoría','Inscritos','Pagaron (No.)','Pagado (valor)','% que ya pagó','Por pagar (valor)'].forEach(function(hd,i){ setC(ws,K0,4+i,hd,'head'); });
+        var CL = s.categorias, c1 = K0+2, c2 = K0+1+CL.length;
+        CL.forEach(function(x,i){
+          var R=K0+1+i, xr=R+1;
+          setC(ws,R,4,x.nombre,'cell',F.TXT);
+          setC(ws,R,5,{f:'COUNTIF('+CAT+',E'+xr+')',v:x.inscritos},'cell',F.INT);
+          setC(ws,R,6,{f:'COUNTIFS('+CAT+',E'+xr+','+E+',"Pagada")',v:x.pag.n},'cell',F.INT);
+          setC(ws,R,7,{f:'SUMIFS('+Fv+','+CAT+',E'+xr+','+E+',"Pagada")',v:x.pag.v},'cell',F.MONEY);
+          setC(ws,R,8,{f:'IF(F'+xr+'=0,0,G'+xr+'/F'+xr+')',v:x.inscritos?x.pag.n/x.inscritos:0},'cell',F.PCT);
+          setC(ws,R,9,{f:'SUMIF('+CAT+',E'+xr+','+Fv+')-H'+xr,v:x.total-x.pag.v},'cell',F.MONEY);
+        });
+        var CT = K0+1+CL.length, ctx = CT+1;
+        setC(ws,CT,4,'Total','tot');
+        setC(ws,CT,5,{f:'SUM(F'+c1+':F'+c2+')',v:s.inscritos},'tot',F.INT);
+        setC(ws,CT,6,{f:'SUM(G'+c1+':G'+c2+')',v:s.pagada.n},'tot',F.INT);
+        setC(ws,CT,7,{f:'SUM(H'+c1+':H'+c2+')',v:s.pagada.v},'tot',F.MONEY);
+        setC(ws,CT,8,{f:'IF(F'+ctx+'=0,0,G'+ctx+'/F'+ctx+')',v:s.pctPagadas},'tot',F.PCT);
+        setC(ws,CT,9,{f:'SUM(J'+c1+':J'+c2+')',v:s.total-s.pagada.v},'tot',F.MONEY);
+        setC(ws,CT+1,4,'Control','cell');
+        setC(ws,CT+1,5,{f:'IF(AND(F'+ctx+'=COUNTA('+A+'),G'+ctx+'=COUNTIF('+E+',"Pagada"),H'+ctx+'=SUMIF('+E+',"Pagada",'+Fv+')),"Cuadra","Revisar")',v:'Cuadra'},'cell',F.GEN);
+        ultimaFila = CT+1;
+      }
+      ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:ultimaFila,c:Math.max(11, cols.length-1)}});
+      ws['!cols']=[{wch:11},{wch:13},{wch:12},{wch:24},{wch:14},{wch:24},{wch:40},{wch:34},{wch:15},{wch:14},{wch:28},{wch:16},{wch:26},{wch:14}];
       ws['!rows']=[{hpt:22}];
       ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:n,c:cols.length-1}})};
       progSheets.push({ws:ws,name:names[pi],first:first,last:last});
@@ -2778,6 +2936,13 @@ if (typeof module!=='undefined') module.exports = Core;
     'Telefono':'Teléfono fijo registrado.',
     'Celular':'Celular registrado.',
     'Periodo':'Periodo de la orden que quedó en el informe.',
+    'Fecha creación':'Día en que se generó la orden de pago.',
+    'Categoría':'Categoría del evento en la que quedó inscrita la persona.',
+    'Pagos por categoría|Inscritos':'Personas inscritas en esta categoría.',
+    'Pagos por categoría|Pagaron':'Personas de esta categoría que ya pagaron.',
+    'Pagos por categoría|Valor pagado':'Dinero ya pagado en esta categoría.',
+    'Pagos por categoría|% que ya pagó':'De los inscritos de esta categoría, cuántos ya pagaron.',
+    'Pagos por categoría|Por pagar':'Dinero que falta por recibir en esta categoría.',
     // Resúmenes
     'Resumen por Estado 2|No.':'Personas en ese estado de pago.',
     'Resumen por Estado 2|% inscritos':'Qué parte de los inscritos está en ese estado.',
